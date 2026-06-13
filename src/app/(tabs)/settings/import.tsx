@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } fr
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system';
+import { File } from 'expo-file-system';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, FontSize, Spacing, BorderRadius } from '@/constants/theme';
 import { importPasswordsFromCSV, importCardsFromCSV, type ImportResult } from '@/features/import-export/csv-handler';
@@ -26,7 +26,7 @@ export default function ImportScreen() {
       setImportType(type);
 
       const fileUri = doc.assets[0].uri;
-      const content = await FileSystem.readAsStringAsync(fileUri, { encoding: FileSystem.EncodingType.UTF8 });
+      const content = await new File(fileUri).text();
 
       let importResult: ImportResult;
       if (type === 'passwords') {
