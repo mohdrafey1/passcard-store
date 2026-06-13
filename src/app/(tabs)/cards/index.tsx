@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, FontSize, Spacing, BorderRadius, Shadow } from '@/constants/theme';
 import SearchBar from '@/components/SearchBar';
 import EmptyState from '@/components/EmptyState';
+import ActionSheet, { type SheetAction } from '@/components/ActionSheet';
 import { useCardStore } from '@/features/cards/store';
 import { useSettingsStore } from '@/features/settings/store';
 import { copyToClipboard } from '@/utils/clipboard';
@@ -59,6 +60,7 @@ export default function CardListScreen() {
   const { cards, loading, load, remove } = useCardStore();
   const clipboardDuration = useSettingsStore((s) => s.clipboardClearDuration);
   const [searchQuery, setSearchQuery] = useState('');
+  const [actionItem, setActionItem] = useState<CardEntry | null>(null);
   const debouncedSearch = useDebounce(searchQuery, 300);
 
   useEffect(() => {
@@ -79,22 +81,22 @@ export default function CardListScreen() {
 
   const filtered = useCardStore((s) => s.getFiltered)();
 
-  const handleLongPress = useCallback((item: CardEntry) => {
-    Alert.alert(item.cardNickname || 'Card', 'Choose an action', [
-      { text: 'Copy Card Number', onPress: () => copyToClipboard(item.cardNumber, clipboardDuration) },
-      { text: 'Copy CVV', onPress: () => copyToClipboard(item.cvv, clipboardDuration) },
-      { text: 'Copy Expiry', onPress: () => copyToClipboard(`${item.expiryMonth}/${item.expiryYear}`, clipboardDuration) },
-      { text: 'Share', onPress: () => shareCard(item) },
-      {
-        text: 'Delete', style: 'destructive',
-        onPress: () => Alert.alert('Delete', `Delete this card?`, [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Delete', style: 'destructive', onPress: () => remove(item.id) },
-        ]),
-      },
+  const confirmDelete = useCallback((item: CardEntry) => {
+    Alert.alert('Delete Card', `Delete "${item.cardNickname || 'this card'}"? This cannot be undone.`, [
       { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => remove(item.id) },
     ]);
-  }, [clipboardDuration, remove]);
+  }, [remove]);
+
+  const actionItemActions: SheetAction[] = actionItem
+    ? [
+        { label: 'Copy Card Number', icon: 'card-outline', onPress: () => copyToClipboard(actionItem.cardNumber, clipboardDuration) },
+        { label: 'Copy CVV', icon: 'lock-closed-outline', onPress: () => copyToClipboard(actionItem.cvv, clipboardDuration) },
+        { label: 'Copy Expiry', icon: 'calendar-outline', onPress: () => copyToClipboard(`${actionItem.expiryMonth}/${actionItem.expiryYear}`, clipboardDuration) },
+        { label: 'Share', icon: 'share-outline', onPress: () => shareCard(actionItem) },
+        { label: 'Delete', icon: 'trash-outline', destructive: true, onPress: () => confirmDelete(actionItem) },
+      ]
+    : [];
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -115,15 +117,24 @@ export default function CardListScreen() {
           <CreditCardWidget
             card={item}
             onPress={() => router.push(`/(tabs)/cards/${item.id}`)}
-            onLongPress={() => handleLongPress(item)}
+            onLongPress={() => setActionItem(item)}
           />
         )}
         keyExtractor={(item) => item.id}
+        style={styles.list}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <EmptyState icon="card-outline" title="No cards yet" subtitle="Tap + to add your first card" />
         }
+      />
+
+      <ActionSheet
+        visible={!!actionItem}
+        onClose={() => setActionItem(null)}
+        title={actionItem?.cardNickname || 'Card'}
+        subtitle={actionItem ? `•••• ${actionItem.cardNumber.slice(-4)}` : undefined}
+        actions={actionItemActions}
       />
     </SafeAreaView>
   );
@@ -135,7 +146,8 @@ const styles = StyleSheet.create({
   title: { fontSize: FontSize.xl, fontWeight: '700', color: Colors.text },
   addButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.secondary, alignItems: 'center', justifyContent: 'center' },
   searchContainer: { paddingHorizontal: Spacing.base, marginBottom: Spacing.sm },
-  listContent: { paddingHorizontal: Spacing.base, paddingBottom: Spacing['3xl'] },
+  list: { flex: 1 },
+  listContent: { flexGrow: 1, paddingHorizontal: Spacing.base, paddingBottom: Spacing['3xl'] },
   creditCard: { borderRadius: BorderRadius.xl, padding: Spacing.lg, marginBottom: Spacing.base, minHeight: 200, justifyContent: 'space-between' },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   cardNickname: { fontSize: FontSize.base, fontWeight: '600', color: Colors.primaryLight },

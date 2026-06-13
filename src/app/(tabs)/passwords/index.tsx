@@ -7,6 +7,7 @@ import { Colors, FontSize, Spacing, BorderRadius } from '@/constants/theme';
 import SearchBar from '@/components/SearchBar';
 import VaultCard from '@/components/VaultCard';
 import EmptyState from '@/components/EmptyState';
+import ActionSheet, { type SheetAction } from '@/components/ActionSheet';
 import { usePasswordStore } from '@/features/passwords/store';
 import { copyToClipboard } from '@/utils/clipboard';
 import { sharePassword } from '@/utils/share';
@@ -20,6 +21,7 @@ export default function PasswordListScreen() {
   const { passwords, loading, load, remove, duplicate, search, selectedCategory, setCategory } = usePasswordStore();
   const clipboardDuration = useSettingsStore((s) => s.clipboardClearDuration);
   const [searchQuery, setSearchQuery] = useState(params.search || '');
+  const [actionItem, setActionItem] = useState<PasswordEntry | null>(null);
   const debouncedSearch = useDebounce(searchQuery, 300);
 
   useEffect(() => {
@@ -42,26 +44,27 @@ export default function PasswordListScreen() {
 
   const filtered = usePasswordStore((s) => s.getFiltered)();
 
-  const handleLongPress = useCallback((item: PasswordEntry) => {
-    Alert.alert(item.title, 'Choose an action', [
-      { text: 'Copy Password', onPress: () => copyToClipboard(item.password, clipboardDuration) },
-      { text: 'Copy Email', onPress: () => copyToClipboard(item.email, clipboardDuration) },
-      { text: 'Copy Username', onPress: () => copyToClipboard(item.username, clipboardDuration) },
-      { text: 'Share', onPress: () => sharePassword(item) },
-      { text: 'Duplicate', onPress: () => duplicate(item.id) },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: () => {
-          Alert.alert('Delete', `Delete "${item.title}"?`, [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Delete', style: 'destructive', onPress: () => remove(item.id) },
-          ]);
-        },
-      },
+  const confirmDelete = useCallback((item: PasswordEntry) => {
+    Alert.alert('Delete Password', `Delete "${item.title}"? This cannot be undone.`, [
       { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => remove(item.id) },
     ]);
-  }, [clipboardDuration, duplicate, remove]);
+  }, [remove]);
+
+  const actionItemActions: SheetAction[] = actionItem
+    ? [
+        { label: 'Copy Password', icon: 'key-outline', onPress: () => copyToClipboard(actionItem.password, clipboardDuration) },
+        ...(actionItem.email
+          ? [{ label: 'Copy Email', icon: 'mail-outline', onPress: () => copyToClipboard(actionItem.email, clipboardDuration) } as SheetAction]
+          : []),
+        ...(actionItem.username
+          ? [{ label: 'Copy Username', icon: 'person-outline', onPress: () => copyToClipboard(actionItem.username, clipboardDuration) } as SheetAction]
+          : []),
+        { label: 'Share', icon: 'share-outline', onPress: () => sharePassword(actionItem) },
+        { label: 'Duplicate', icon: 'copy-outline', onPress: () => duplicate(actionItem.id) },
+        { label: 'Delete', icon: 'trash-outline', destructive: true, onPress: () => confirmDelete(actionItem) },
+      ]
+    : [];
 
   const renderItem = ({ item }: { item: PasswordEntry }) => (
     <VaultCard
@@ -70,7 +73,7 @@ export default function PasswordListScreen() {
       leftIcon={<Text style={{ fontSize: 18 }}>{CATEGORY_ICONS[item.category] || '🔒'}</Text>}
       rightText={item.category}
       onPress={() => router.push(`/(tabs)/passwords/${item.id}`)}
-      onLongPress={() => handleLongPress(item)}
+      onLongPress={() => setActionItem(item)}
     />
   );
 
@@ -97,6 +100,7 @@ export default function PasswordListScreen() {
         horizontal
         data={categories}
         showsHorizontalScrollIndicator={false}
+        style={styles.categoryListWrap}
         contentContainerStyle={styles.categoryList}
         renderItem={({ item: cat }) => (
           <TouchableOpacity
@@ -115,6 +119,7 @@ export default function PasswordListScreen() {
         data={filtered}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
+        style={styles.list}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
@@ -124,6 +129,14 @@ export default function PasswordListScreen() {
             subtitle="Tap + to add your first password"
           />
         }
+      />
+
+      <ActionSheet
+        visible={!!actionItem}
+        onClose={() => setActionItem(null)}
+        title={actionItem?.title}
+        subtitle={actionItem?.website || actionItem?.email || undefined}
+        actions={actionItemActions}
       />
     </SafeAreaView>
   );
@@ -146,7 +159,8 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   searchContainer: { paddingHorizontal: Spacing.base, marginBottom: Spacing.sm },
-  categoryList: { paddingHorizontal: Spacing.base, gap: Spacing.sm, marginBottom: Spacing.sm, height: 40 },
+  categoryListWrap: { flexGrow: 0, marginBottom: Spacing.sm },
+  categoryList: { paddingHorizontal: Spacing.base, gap: Spacing.sm, alignItems: 'center' },
   categoryPill: {
     paddingHorizontal: Spacing.base, paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.full,
@@ -156,5 +170,6 @@ const styles = StyleSheet.create({
   categoryPillActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
   categoryText: { fontSize: FontSize.sm, color: Colors.textSecondary, fontWeight: '500' },
   categoryTextActive: { color: Colors.white },
-  listContent: { paddingHorizontal: Spacing.base, paddingBottom: Spacing['3xl'] },
+  list: { flex: 1 },
+  listContent: { flexGrow: 1, paddingHorizontal: Spacing.base, paddingBottom: Spacing['3xl'] },
 });
