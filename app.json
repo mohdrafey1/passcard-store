@@ -1,44 +1,48 @@
 {
-  "expo": {
-    "name": "passcard-store",
-    "slug": "passcard-store",
-    "version": "1.0.0",
-    "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "passcardstore",
-    "userInterfaceStyle": "automatic",
-    "ios": {
-      "icon": "./assets/expo.icon"
-    },
-    "android": {
-      "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
-      },
-      "predictiveBackGestureEnabled": false
-    },
-    "web": {
-      "output": "static",
-      "favicon": "./assets/images/favicon.png"
-    },
-    "plugins": [
-      "expo-router",
-      [
-        "expo-splash-screen",
-        {
-          "backgroundColor": "#208AEF",
-          "android": {
-            "image": "./assets/images/splash-icon.png",
-            "imageWidth": 76
-          }
+    "expo": {
+        "name": "passcard-store",
+        "slug": "passcard-store",
+        "version": "1.0.0",
+        "orientation": "portrait",
+        "icon": "./assets/logo.png",
+        "scheme": "passcardstore",
+        "userInterfaceStyle": "automatic",
+        "ios": {
+            "icon": "./assets/logo.png"
+        },
+        "android": {
+            "adaptiveIcon": {
+                "backgroundColor": "#E6F4FE",
+                "foregroundImage": "./assets/logo.png",
+                "backgroundImage": "./assets/logo.png",
+                "monochromeImage": "./assets/logo.png"
+            },
+            "predictiveBackGestureEnabled": false,
+            "package": "com.mohdrafey1.passcardstore"
+        },
+        "web": {
+            "output": "static",
+            "favicon": "./assets/logo.png"
+        },
+        "plugins": [
+            "expo-router",
+            [
+                "expo-splash-screen",
+                {
+                    "backgroundColor": "#208AEF",
+                    "android": {
+                        "image": "./assets/logo.png",
+                        "imageWidth": 76
+                    }
+                }
+            ],
+            "expo-secure-store",
+            "expo-sharing",
+            "expo-sqlite"
+        ],
+        "experiments": {
+            "typedRoutes": true,
+            "reactCompiler": true
         }
-      ]
-    ],
-    "experiments": {
-      "typedRoutes": true,
-      "reactCompiler": true
     }
-  }
 }
