@@ -12,7 +12,7 @@
         },
         "android": {
             "adaptiveIcon": {
-                "backgroundColor": "#E6F4FE",
+                "backgroundColor": "#0A0E1A",
                 "foregroundImage": "./assets/logo.png",
                 "backgroundImage": "./assets/logo.png",
                 "monochromeImage": "./assets/logo.png"
@@ -20,16 +20,12 @@
             "predictiveBackGestureEnabled": false,
             "package": "com.mohdrafey1.passcardstore"
         },
-        "web": {
-            "output": "static",
-            "favicon": "./assets/logo.png"
-        },
         "plugins": [
             "expo-router",
             [
                 "expo-splash-screen",
                 {
-                    "backgroundColor": "#208AEF",
+                    "backgroundColor": "#0A0E1A",
                     "android": {
                         "image": "./assets/logo.png",
                         "imageWidth": 76
@@ -38,7 +34,9 @@
             ],
             "expo-secure-store",
             "expo-sharing",
-            "expo-sqlite"
+            "expo-sqlite",
+            "expo-local-authentication",
+            "expo-document-picker"
         ],
         "experiments": {
             "typedRoutes": true,
