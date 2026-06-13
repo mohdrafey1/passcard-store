@@ -1,4 +1,4 @@
-import * as FileSystem from 'expo-file-system';
+import { Paths, File } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import CryptoJS from 'crypto-js';
 import { passwordRepository } from '@/storage/password-repository';
@@ -64,13 +64,10 @@ export async function createBackup(pin: string): Promise<string> {
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const filename = `passcard-backup-${timestamp}.vaultx`;
-  const fileUri = `${FileSystem.cacheDirectory}${filename}`;
+  const file = new File(Paths.cache, filename);
+  file.write(backupContent);
 
-  await FileSystem.writeAsStringAsync(fileUri, backupContent, {
-    encoding: FileSystem.EncodingType.UTF8,
-  });
-
-  return fileUri;
+  return file.uri;
 }
 
 /**
@@ -95,9 +92,8 @@ export async function restoreBackup(
   fileUri: string,
   pin: string,
 ): Promise<{ passwords: number; cards: number }> {
-  const content = await FileSystem.readAsStringAsync(fileUri, {
-    encoding: FileSystem.EncodingType.UTF8,
-  });
+  const file = new File(fileUri);
+  const content = await file.text();
 
   const parts = content.split(':');
   if (parts.length !== 2) {

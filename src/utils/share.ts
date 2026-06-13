@@ -1,5 +1,5 @@
+import { Paths, File } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import * as FileSystem from 'expo-file-system';
 import type { PasswordEntry } from '@/types/password';
 import type { CardEntry } from '@/types/card';
 
@@ -42,12 +42,10 @@ export async function shareText(text: string, filename = 'passcard-share.txt'): 
     throw new Error('Sharing is not available on this device');
   }
 
-  const fileUri = `${FileSystem.cacheDirectory}${filename}`;
-  await FileSystem.writeAsStringAsync(fileUri, text, {
-    encoding: FileSystem.EncodingType.UTF8,
-  });
+  const file = new File(Paths.cache, filename);
+  file.write(text);
 
-  await Sharing.shareAsync(fileUri, {
+  await Sharing.shareAsync(file.uri, {
     mimeType: 'text/plain',
     dialogTitle: 'Share from Passcard Store',
   });

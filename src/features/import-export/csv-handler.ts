@@ -1,5 +1,5 @@
 import Papa from 'papaparse';
-import * as FileSystem from 'expo-file-system';
+import { Paths, File } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import type { PasswordEntry } from '@/types/password';
 import type { CardEntry } from '@/types/card';
@@ -52,14 +52,12 @@ export function exportCardsToCSV(cards: CardEntry[]): string {
  * Save CSV to file and share
  */
 export async function exportAndShareCSV(csvContent: string, filename: string): Promise<void> {
-  const fileUri = `${FileSystem.cacheDirectory}${filename}`;
-  await FileSystem.writeAsStringAsync(fileUri, csvContent, {
-    encoding: FileSystem.EncodingType.UTF8,
-  });
+  const file = new File(Paths.cache, filename);
+  file.write(csvContent);
 
   const isAvailable = await Sharing.isAvailableAsync();
   if (isAvailable) {
-    await Sharing.shareAsync(fileUri, {
+    await Sharing.shareAsync(file.uri, {
       mimeType: 'text/csv',
       dialogTitle: `Export ${filename}`,
     });

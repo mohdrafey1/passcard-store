@@ -21,7 +21,7 @@ export default function BackupScreen() {
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Create',
-        onPress: async (inputPin) => {
+        onPress: async (inputPin?: string) => {
           if (!inputPin || inputPin.length < 4) {
             Alert.alert('Error', 'Valid PIN required');
             return;

@@ -71,7 +71,7 @@ export default function SettingsScreen() {
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Change',
-        onPress: async (pin) => {
+        onPress: async (pin?: string) => {
           if (pin && (pin.length === 4 || pin.length === 6) && /^\d+$/.test(pin)) {
             await changePin(pin);
             Alert.alert('Success', 'PIN changed successfully');
@@ -88,7 +88,7 @@ export default function SettingsScreen() {
       text: `${opt.label}${settings.autoLockDuration === opt.value ? ' ✓' : ''}`,
       onPress: () => settings.setAutoLockDuration(opt.value),
     }));
-    options.push({ text: 'Cancel', onPress: () => {} });
+    options.push({ text: 'Cancel', onPress: async () => {} });
     Alert.alert('Auto Lock', 'Lock after going to background', options);
   };
 
@@ -97,7 +97,7 @@ export default function SettingsScreen() {
       text: `${opt.label}${settings.clipboardClearDuration === opt.value ? ' ✓' : ''}`,
       onPress: () => settings.setClipboardClearDuration(opt.value),
     }));
-    options.push({ text: 'Cancel', onPress: () => {} });
+    options.push({ text: 'Cancel', onPress: async () => {} });
     Alert.alert('Clipboard Clear', 'Clear clipboard after copying', options);
   };
 
