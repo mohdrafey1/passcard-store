@@ -1,56 +1,254 @@
-# Welcome to your Expo app 👋
+# 🔐 Passcard Store
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A production-grade, fully offline secure vault for passwords and cards — built with Expo SDK 56, React Native, and TypeScript.
 
-## Get started
+**All data stays on your device. No cloud. No accounts. No tracking.**
 
-1. Install dependencies
+---
 
-   ```bash
-   npm install
-   ```
+## ✨ Features
 
-2. Start the app
+### 🛡️ Security
+- **Master PIN** — 4 or 6 digit PIN with PBKDF2 hashing (10,000 iterations)
+- **AES-256-CBC Encryption** — Every sensitive record encrypted at rest
+- **Biometric Unlock** — Fingerprint / Face authentication support
+- **Lockout Protection** — 5 failed attempts → 60 second lockout
+- **Auto-Lock** — Configurable lock on app background (immediate / 30s / 1m / 5m / 15m)
+- **Clipboard Auto-Clear** — Automatically clears copied data after 15s / 30s / 60s
+- **Zero Plain-Text Storage** — PIN hash and salt stored securely, never the raw PIN
 
-   ```bash
-   npx expo start
-   ```
+### 🔑 Password Management
+- Create, edit, duplicate, and delete password entries
+- Category organization (Social, Banking, Work, Personal, Shopping, etc.)
+- Category filter pills for quick browsing
+- Password strength indicator (Weak → Strong)
+- Random password generator with configurable options
+- Copy username / email / password with one tap
+- Share via native share sheet
 
-In the output, you'll find options to open the app in a
+### 💳 Card Management
+- Store credit/debit card details securely
+- Visual credit card widgets with gradient styling
+- Masked card numbers (`•••• •••• •••• 1234`)
+- Tap to reveal sensitive card details
+- Copy card number / CVV / expiry
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+### 📊 Dashboard
+- Total passwords and cards count
+- Recently added items feed
+- Global search across all entries
+- Quick action grid (Add Password, Add Card, Import, Export)
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+### 📦 Import / Export / Backup
+- **CSV Import** — Import passwords or cards from CSV files with duplicate detection
+- **CSV Export** — Export all data as CSV via native share sheet
+- **Encrypted Backup** — Create `.vaultx` backup files encrypted with AES-256
+- **Restore** — Restore from encrypted backup with PIN verification
 
-## Get a fresh project
+### ⚙️ Settings
+- Change PIN
+- Toggle biometric unlock
+- Auto-lock duration picker
+- Clipboard clear duration picker
+- Delete all data (with confirmation)
 
-When you're ready, run:
+---
 
-```bash
-npm run reset-project
+## 🏗️ Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Framework | Expo SDK 56 + React Native 0.85 |
+| Language | TypeScript (strict) |
+| Navigation | Expo Router (file-based) |
+| State | Zustand |
+| Database | expo-sqlite (WAL mode) |
+| Encryption | crypto-js (AES-256-CBC) |
+| Hashing | crypto-js (PBKDF2) + expo-crypto (random bytes) |
+| Key Storage | expo-secure-store |
+| Biometrics | expo-local-authentication |
+| CSV | papaparse |
+| File I/O | expo-file-system (SDK 56 File API) |
+| Sharing | expo-sharing |
+| Clipboard | expo-clipboard |
+| Haptics | expo-haptics |
+| Styling | StyleSheet.create() (pure CSS) |
+| Platform | Android only |
+
+---
+
+## 📁 Project Structure
+
+```
+src/
+├── app/                          # Expo Router screens
+│   ├── _layout.tsx               # Root layout (init + auth gate)
+│   ├── index.tsx                 # Redirect based on auth state
+│   ├── (auth)/                   # Auth flow
+│   │   ├── create-pin.tsx        # First-time PIN setup
+│   │   └── unlock.tsx            # PIN unlock + biometrics
+│   └── (tabs)/                   # Main app
+│       ├── _layout.tsx           # Bottom tab navigator
+│       ├── index.tsx             # Dashboard
+│       ├── passwords/            # Password CRUD screens
+│       ├── cards/                # Card CRUD screens
+│       └── settings/             # Settings, import, export, backup
+├── components/                   # Reusable UI components
+│   ├── PinPad.tsx                # Numeric keypad with haptics
+│   ├── PasswordStrengthIndicator.tsx
+│   ├── SecureField.tsx           # Masked input with eye toggle
+│   ├── SearchBar.tsx
+│   ├── VaultCard.tsx
+│   └── EmptyState.tsx
+├── constants/
+│   ├── theme.ts                  # Design system (colors, spacing, shadows)
+│   └── categories.ts            # Password categories + icons
+├── features/
+│   ├── passwords/store.ts       # Zustand password store
+│   ├── cards/store.ts           # Zustand card store
+│   ├── settings/store.ts        # Zustand settings + auth store
+│   └── import-export/
+│       ├── csv-handler.ts       # CSV import/export
+│       └── backup-handler.ts    # Encrypted .vaultx backup/restore
+├── hooks/
+│   ├── useAutoLock.ts           # Background auto-lock
+│   └── useDebounce.ts           # Search debounce
+├── security/
+│   ├── encryption.ts            # AES-256-CBC encrypt/decrypt
+│   ├── pin.ts                   # PBKDF2 PIN hashing
+│   ├── biometrics.ts            # Biometric auth wrapper
+│   └── lockout.ts               # Failed attempt tracking
+├── storage/
+│   ├── database.ts              # SQLite init + schema
+│   ├── encrypted-repository.ts  # Generic encrypted CRUD
+│   ├── password-repository.ts   # Password collection
+│   ├── card-repository.ts       # Card collection
+│   └── settings-storage.ts     # Settings in SecureStore
+├── types/
+│   ├── password.ts
+│   ├── card.ts
+│   └── settings.ts
+└── utils/
+    ├── clipboard.ts             # Copy with auto-clear
+    ├── share.ts                 # Native share sheet
+    └── password-generator.ts    # Random password + strength
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+---
 
-### Other setup steps
+## 🔒 Security Architecture
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+```
+┌─────────────────────────────────────────┐
+│               App Layer                  │
+│  Screens → Zustand Stores → Repository  │
+└────────────────┬────────────────────────┘
+                 │
+┌────────────────▼────────────────────────┐
+│        Encrypted Repository              │
+│  encrypt(JSON) → SQLite encrypted_data   │
+│  Search index columns (plaintext)        │
+└────────────────┬────────────────────────┘
+                 │
+┌────────────────▼──────────┐  ┌──────────────────────┐
+│      expo-sqlite          │  │   expo-secure-store   │
+│  • encrypted_data (AES)   │  │  • Encryption Key     │
+│  • search indexes         │  │  • PIN Hash (PBKDF2)  │
+│  • timestamps             │  │  • PIN Salt           │
+└───────────────────────────┘  │  • App Settings       │
+                               └──────────────────────┘
+```
 
-## Learn more
+- **Sensitive fields** (passwords, card numbers, CVVs) are always AES-256-CBC encrypted in `encrypted_data`
+- **Search index columns** (title, website, email, nickname) are stored as plaintext for SQL query performance
+- **Encryption key** is a 256-bit random key stored in device Keystore via `expo-secure-store`
+- **PIN hash** uses PBKDF2 with random salt — raw PIN is never stored
 
-To learn more about developing your project with Expo, look at the following resources:
+---
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## 🚀 Getting Started
 
-## Join the community
+### Prerequisites
 
-Join our community of developers creating universal apps.
+- Node.js 20+ (recommended: 22.x)
+- Android Studio with emulator or physical Android device
+- Expo CLI
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/mohdrafey1/passcard-store.git
+cd passcard-store
+
+# Install dependencies
+npm install
+```
+
+### Development
+
+```bash
+# Start Expo development server
+npx expo start
+
+# Run on Android emulator
+npx expo start --android
+
+# Create a development build (required for native modules)
+npx expo run:android
+```
+
+> **Note:** This app uses native modules (`expo-sqlite`, `expo-secure-store`, `expo-local-authentication`) that require a **development build**. Expo Go may have limited functionality.
+
+### Type Checking
+
+```bash
+npx tsc --noEmit
+```
+
+---
+
+## 📱 App Flow
+
+1. **First Launch** → Create 4 or 6 digit PIN
+2. **Subsequent Opens** → Unlock with PIN or biometrics
+3. **Dashboard** → View stats, search, quick actions
+4. **Manage** → Add/edit/delete passwords and cards
+5. **Protect** → Data auto-encrypted, clipboard auto-cleared
+6. **Backup** → Export CSV or create encrypted `.vaultx` backup
+
+---
+
+## 📄 CSV Format
+
+### Passwords CSV
+
+```csv
+title,website,username,email,password,notes,category
+Gmail,gmail.com,johndoe,john@gmail.com,MyP@ss123,Primary email,Personal
+```
+
+### Cards CSV
+
+```csv
+cardNickname,cardHolderName,cardNumber,expiryMonth,expiryYear,cvv,notes
+My Visa,John Doe,4111111111111111,12,25,123,Primary card
+```
+
+---
+
+## 🛠️ Built With
+
+- [Expo](https://expo.dev) — React Native framework
+- [Expo Router](https://docs.expo.dev/router/introduction/) — File-based routing
+- [Zustand](https://github.com/pmndrs/zustand) — State management
+- [crypto-js](https://github.com/brix/crypto-js) — AES-256 encryption & PBKDF2
+- [papaparse](https://www.papaparse.com/) — CSV parsing
+- [expo-sqlite](https://docs.expo.dev/versions/v56.0.0/sdk/sqlite/) — Local database
+- [expo-secure-store](https://docs.expo.dev/versions/v56.0.0/sdk/securestore/) — Secure key storage
+
+---
+
+## 📜 License
+
+This project is private and not licensed for redistribution.
