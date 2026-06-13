@@ -170,6 +170,30 @@ export default function DashboardScreen() {
             })}
           </>
         )}
+
+        {/* Local-only / backup notice */}
+        <View style={styles.notice}>
+          <View style={styles.noticeHeader}>
+            <Ionicons name="lock-closed" size={18} color={Colors.success} />
+            <Text style={styles.noticeTitle}>Your data stays on this device</Text>
+          </View>
+          <Text style={styles.noticeText}>
+            Everything is encrypted and stored locally. We never upload your passwords or cards
+            to any cloud or server.
+          </Text>
+          <Text style={styles.noticeText}>
+            Before switching or resetting your phone, export a backup (CSV or .vaultx) from
+            Settings — otherwise your data cannot be recovered.
+          </Text>
+          <TouchableOpacity
+            style={styles.noticeButton}
+            onPress={() => router.push('/(tabs)/settings/export')}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="shield-checkmark-outline" size={16} color={Colors.primary} />
+            <Text style={styles.noticeButtonText}>Back up my vault</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -280,5 +304,46 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: Colors.text,
     flex: 1,
+  },
+  notice: {
+    marginTop: Spacing.xl,
+    backgroundColor: Colors.surfaceElevated,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: Spacing.base,
+  },
+  noticeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    marginBottom: Spacing.sm,
+  },
+  noticeTitle: {
+    fontSize: FontSize.sm,
+    fontWeight: '700',
+    color: Colors.text,
+    flex: 1,
+  },
+  noticeText: {
+    fontSize: FontSize.xs,
+    color: Colors.textSecondary,
+    lineHeight: 18,
+    marginBottom: Spacing.sm,
+  },
+  noticeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    marginTop: Spacing.xs,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.primary + '15',
+  },
+  noticeButtonText: {
+    fontSize: FontSize.sm,
+    fontWeight: '700',
+    color: Colors.primary,
   },
 });
