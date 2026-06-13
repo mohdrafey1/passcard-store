@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, FontSize, Spacing, BorderRadius, Shadow } from '@/constants/theme';
 import SearchBar from '@/components/SearchBar';
@@ -28,9 +28,13 @@ export default function DashboardScreen() {
   const loadPasswords = usePasswordStore((s) => s.load);
   const loadCards = useCardStore((s) => s.load);
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  // Refresh stats and recent items every time the dashboard is focused so
+  // newly added or deleted entries are reflected.
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, []),
+  );
 
   async function loadData() {
     await Promise.all([loadPasswords(), loadCards()]);

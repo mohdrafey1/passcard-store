@@ -22,8 +22,8 @@ function PinDot({ filled, error }: { filled: boolean; error: boolean }) {
     <View
       style={[
         styles.dot,
-        filled && styles.dotFilled,
         error && styles.dotError,
+        filled && styles.dotFilled,
       ]}
     />
   );
@@ -76,6 +76,11 @@ export default function PinPad({
 }: PinPadProps) {
   const [pin, setPin] = useState('');
 
+  // Only surface the error while no new digits have been entered. As soon as
+  // the user starts typing again, clear the error styling so the dots fill
+  // normally instead of staying stuck in the red "error" state.
+  const showError = !!error && pin.length === 0;
+
   const handlePress = useCallback(
     (digit: string) => {
       if (pin.length >= pinLength) return;
@@ -101,12 +106,14 @@ export default function PinPad({
       <View style={styles.header}>
         <Text style={styles.title}>{title}</Text>
         {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
-        {error && <Text style={styles.error}>{error}</Text>}
+        <View style={styles.errorContainer}>
+          {showError && <Text style={styles.error}>{error}</Text>}
+        </View>
       </View>
 
       <View style={styles.dotsContainer}>
         {Array.from({ length: pinLength }).map((_, i) => (
-          <PinDot key={i} filled={i < pin.length} error={!!error} />
+          <PinDot key={i} filled={i < pin.length} error={showError} />
         ))}
       </View>
 
@@ -158,10 +165,14 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: 'center',
   },
+  errorContainer: {
+    minHeight: 22,
+    marginTop: Spacing.sm,
+    justifyContent: 'center',
+  },
   error: {
     fontSize: FontSize.sm,
     color: Colors.danger,
-    marginTop: Spacing.sm,
     textAlign: 'center',
   },
   dotsContainer: {

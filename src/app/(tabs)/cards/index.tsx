@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, FontSize, Spacing, BorderRadius, Shadow } from '@/constants/theme';
 import SearchBar from '@/components/SearchBar';
@@ -61,8 +61,6 @@ export default function CardListScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebounce(searchQuery, 300);
 
-  useEffect(() => { load(); }, []);
-
   useEffect(() => {
     if (debouncedSearch) {
       useCardStore.getState().search(debouncedSearch);
@@ -70,6 +68,14 @@ export default function CardListScreen() {
       load();
     }
   }, [debouncedSearch]);
+
+  // Reload on focus so adds/edits/deletes made on child screens are reflected
+  // (the list stays mounted-but-frozen while a child screen is open).
+  useFocusEffect(
+    useCallback(() => {
+      if (!debouncedSearch) load();
+    }, [debouncedSearch]),
+  );
 
   const filtered = useCardStore((s) => s.getFiltered)();
 

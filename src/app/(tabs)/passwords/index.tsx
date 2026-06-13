@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, FontSize, Spacing, BorderRadius } from '@/constants/theme';
 import SearchBar from '@/components/SearchBar';
@@ -23,16 +23,22 @@ export default function PasswordListScreen() {
   const debouncedSearch = useDebounce(searchQuery, 300);
 
   useEffect(() => {
-    load();
-  }, []);
-
-  useEffect(() => {
     if (debouncedSearch) {
       search(debouncedSearch);
     } else {
       load();
     }
   }, [debouncedSearch]);
+
+  // Reload from the database whenever the screen regains focus (e.g. after
+  // adding, editing or deleting an entry on another screen). The list screen
+  // stays mounted-but-frozen while a child screen is open, so store updates
+  // made there don't always re-render it until we explicitly refresh here.
+  useFocusEffect(
+    useCallback(() => {
+      if (!debouncedSearch) load();
+    }, [debouncedSearch]),
+  );
 
   const filtered = usePasswordStore((s) => s.getFiltered)();
 
