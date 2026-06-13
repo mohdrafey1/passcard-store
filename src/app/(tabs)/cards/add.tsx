@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, Alert } from 'react-native';
+import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, FontSize, Spacing, BorderRadius } from '@/constants/theme';
@@ -30,12 +31,13 @@ export default function AddCardScreen() {
         expiryMonth,
         expiryYear,
         cvv,
-        cardNickname,
-        notes,
+        cardNickname: cardNickname || 'Card',
+        notes: notes || '',
       });
       router.back();
-    } catch (e) {
-      Alert.alert('Error', 'Failed to save card');
+    } catch (e: any) {
+      console.error('Card save error:', e);
+      Alert.alert('Error', `Failed to save card: ${e?.message || 'Unknown error'}`);
     } finally {
       setSaving(false);
     }
@@ -48,7 +50,7 @@ export default function AddCardScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="chevron-back" size={24} color={Colors.text} />
@@ -59,23 +61,25 @@ export default function AddCardScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.form} showsVerticalScrollIndicator={false}>
-        <InputField label="Card Nickname" value={cardNickname} onChangeText={setCardNickname} placeholder="e.g. My Visa" />
-        <InputField label="Card Holder Name *" value={cardHolderName} onChangeText={setCardHolderName} placeholder="e.g. John Doe" autoCapitalize="words" />
-        <InputField label="Card Number *" value={cardNumber} onChangeText={formatCardNumber} placeholder="0000 0000 0000 0000" keyboardType="number-pad" maxLength={19} />
-        <View style={styles.row}>
-          <View style={styles.halfField}>
-            <InputField label="Month *" value={expiryMonth} onChangeText={(t) => setExpiryMonth(t.replace(/\D/g, '').slice(0, 2))} placeholder="MM" keyboardType="number-pad" maxLength={2} />
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView contentContainerStyle={styles.form} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          <InputField label="Card Nickname" value={cardNickname} onChangeText={setCardNickname} placeholder="e.g. My Visa" />
+          <InputField label="Card Holder Name *" value={cardHolderName} onChangeText={setCardHolderName} placeholder="e.g. John Doe" autoCapitalize="words" />
+          <InputField label="Card Number *" value={cardNumber} onChangeText={formatCardNumber} placeholder="0000 0000 0000 0000" keyboardType="number-pad" maxLength={19} />
+          <View style={styles.row}>
+            <View style={styles.halfField}>
+              <InputField label="Month *" value={expiryMonth} onChangeText={(t) => setExpiryMonth(t.replace(/\D/g, '').slice(0, 2))} placeholder="MM" keyboardType="number-pad" maxLength={2} />
+            </View>
+            <View style={styles.halfField}>
+              <InputField label="Year *" value={expiryYear} onChangeText={(t) => setExpiryYear(t.replace(/\D/g, '').slice(0, 2))} placeholder="YY" keyboardType="number-pad" maxLength={2} />
+            </View>
+            <View style={styles.halfField}>
+              <InputField label="CVV *" value={cvv} onChangeText={(t) => setCvv(t.replace(/\D/g, '').slice(0, 4))} placeholder="123" keyboardType="number-pad" maxLength={4} secureTextEntry />
+            </View>
           </View>
-          <View style={styles.halfField}>
-            <InputField label="Year *" value={expiryYear} onChangeText={(t) => setExpiryYear(t.replace(/\D/g, '').slice(0, 2))} placeholder="YY" keyboardType="number-pad" maxLength={2} />
-          </View>
-          <View style={styles.halfField}>
-            <InputField label="CVV *" value={cvv} onChangeText={(t) => setCvv(t.replace(/\D/g, '').slice(0, 4))} placeholder="123" keyboardType="number-pad" maxLength={4} secureTextEntry />
-          </View>
-        </View>
-        <InputField label="Notes" value={notes} onChangeText={setNotes} placeholder="Optional notes" multiline numberOfLines={3} />
-      </ScrollView>
+          <InputField label="Notes" value={notes} onChangeText={setNotes} placeholder="Optional notes" multiline numberOfLines={3} />
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

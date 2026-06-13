@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, SafeAreaView, Alert } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, FontSize, Spacing, BorderRadius, Shadow } from '@/constants/theme';
@@ -23,7 +24,7 @@ function CreditCardWidget({ card, onPress, onLongPress }: { card: CardEntry; onP
   return (
     <TouchableOpacity onPress={onPress} onLongPress={onLongPress} activeOpacity={0.8}>
       <LinearGradient
-        colors={['#2D1B69', '#1A1145', '#0D0A2E']}
+        colors={['#3D2E22', '#1F1712', '#130E0A']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={[styles.creditCard, Shadow.md]}
@@ -90,7 +91,7 @@ export default function CardListScreen() {
   }, [clipboardDuration, remove]);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.title}>Cards</Text>
         <TouchableOpacity style={styles.addButton} onPress={() => router.push('/(tabs)/cards/add')}>
@@ -132,8 +133,8 @@ const styles = StyleSheet.create({
   creditCard: { borderRadius: BorderRadius.xl, padding: Spacing.lg, marginBottom: Spacing.base, minHeight: 200, justifyContent: 'space-between' },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   cardNickname: { fontSize: FontSize.base, fontWeight: '600', color: Colors.primaryLight },
-  cardNumber: { fontSize: FontSize.lg, fontWeight: '700', color: Colors.text, letterSpacing: 3, marginVertical: Spacing.lg, fontFamily: 'monospace' },
+  cardNumber: { fontSize: FontSize.lg, fontWeight: '700', color: '#FFFFFF', letterSpacing: 3, marginVertical: Spacing.lg, fontFamily: 'monospace' },
   cardFooter: { flexDirection: 'row', justifyContent: 'space-between' },
-  cardLabel: { fontSize: 9, color: Colors.textMuted, letterSpacing: 1, marginBottom: 2 },
-  cardValue: { fontSize: FontSize.sm, fontWeight: '600', color: Colors.text },
+  cardLabel: { fontSize: 9, color: '#B0A090', letterSpacing: 1, marginBottom: 2 },
+  cardValue: { fontSize: FontSize.sm, fontWeight: '600', color: '#FFFFFF' },
 });

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, Alert } from 'react-native';
+import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, FontSize, Spacing, BorderRadius } from '@/constants/theme';
@@ -27,10 +28,11 @@ export default function AddPasswordScreen() {
 
     setSaving(true);
     try {
-      await addPassword({ title, website, username, email, password, notes, category });
+      await addPassword({ title, website: website || '', username: username || '', email: email || '', password, notes: notes || '', category });
       router.back();
-    } catch (e) {
-      Alert.alert('Error', 'Failed to save password');
+    } catch (e: any) {
+      console.error('Password save error:', e);
+      Alert.alert('Error', `Failed to save password: ${e?.message || 'Unknown error'}`);
     } finally {
       setSaving(false);
     }
@@ -41,7 +43,7 @@ export default function AddPasswordScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="chevron-back" size={24} color={Colors.text} />
@@ -52,7 +54,8 @@ export default function AddPasswordScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.form} showsVerticalScrollIndicator={false}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView contentContainerStyle={styles.form} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <InputField label="Title *" value={title} onChangeText={setTitle} placeholder="e.g. Gmail" />
         <InputField label="Website" value={website} onChangeText={setWebsite} placeholder="e.g. gmail.com" keyboardType="url" autoCapitalize="none" />
         <InputField label="Username" value={username} onChangeText={setUsername} placeholder="e.g. johndoe" autoCapitalize="none" />
@@ -81,7 +84,8 @@ export default function AddPasswordScreen() {
         </View>
 
         <InputField label="Notes" value={notes} onChangeText={setNotes} placeholder="Optional notes" multiline numberOfLines={3} />
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
