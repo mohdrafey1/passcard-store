@@ -1,6 +1,6 @@
 import { getDatabase } from './database';
 import { encrypt, decrypt, getEncryptionKey } from '@/security/encryption';
-import { v4 as uuidv4 } from 'uuid';
+import * as ExpoCrypto from 'expo-crypto';
 
 export interface BaseEntity {
   id: string;
@@ -41,7 +41,7 @@ export class EncryptedRepository<T extends BaseEntity> {
 
     const record = {
       ...item,
-      id: uuidv4(),
+      id: ExpoCrypto.randomUUID(),
       createdAt: now,
       updatedAt: now,
     } as T;

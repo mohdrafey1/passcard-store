@@ -42,11 +42,23 @@ export async function initializeEncryptionKey(): Promise<string> {
 }
 
 /**
+ * Convert a byte array to a lowercase hex string
+ */
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+/**
  * Encrypt plaintext using AES-256-CBC
  */
 export function encrypt(plainText: string, key: string): string {
   const keyWordArray = CryptoJS.enc.Hex.parse(key);
-  const iv = CryptoJS.lib.WordArray.random(16);
+  // Generate the IV with expo-crypto's native secure RNG instead of
+  // CryptoJS.lib.WordArray.random, which relies on a JS getRandomValues
+  // polyfill that is unreliable under Hermes and throws on some devices.
+  const iv = CryptoJS.enc.Hex.parse(bytesToHex(ExpoCrypto.getRandomBytes(16)));
   const encrypted = CryptoJS.AES.encrypt(plainText, keyWordArray, {
     iv,
     mode: CryptoJS.mode.CBC,

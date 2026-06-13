@@ -31,12 +31,21 @@ export default function CardDetailScreen() {
 
   async function loadEntry() {
     if (!id) return;
-    const e = await cardRepository.findById(id);
-    if (e) {
-      setEntry(e);
-      setCardHolderName(e.cardHolderName); setCardNumber(e.cardNumber);
-      setExpiryMonth(e.expiryMonth); setExpiryYear(e.expiryYear);
-      setCvv(e.cvv); setCardNickname(e.cardNickname); setNotes(e.notes);
+    try {
+      const e = await cardRepository.findById(id);
+      if (e) {
+        setEntry(e);
+        setCardHolderName(e.cardHolderName); setCardNumber(e.cardNumber);
+        setExpiryMonth(e.expiryMonth); setExpiryYear(e.expiryYear);
+        setCvv(e.cvv); setCardNickname(e.cardNickname); setNotes(e.notes);
+      } else {
+        Alert.alert('Error', 'Card not found');
+        router.back();
+      }
+    } catch (e: any) {
+      console.error('Failed to load card:', e);
+      Alert.alert('Error', `Failed to open card: ${e?.message || 'Unknown error'}`);
+      router.back();
     }
   }
 

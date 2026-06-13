@@ -1,5 +1,6 @@
 import { Paths, File } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import * as ExpoCrypto from 'expo-crypto';
 import CryptoJS from 'crypto-js';
 import { passwordRepository } from '@/storage/password-repository';
 import { cardRepository } from '@/storage/card-repository';
@@ -52,7 +53,11 @@ export async function createBackup(pin: string): Promise<string> {
   const jsonString = JSON.stringify(payload);
   const backupKey = deriveBackupKey(pin);
   const keyWordArray = CryptoJS.enc.Hex.parse(backupKey);
-  const iv = CryptoJS.lib.WordArray.random(16);
+  // Use expo-crypto's native secure RNG for the IV (see security/encryption.ts).
+  const ivHex = Array.from(ExpoCrypto.getRandomBytes(16))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+  const iv = CryptoJS.enc.Hex.parse(ivHex);
 
   const encrypted = CryptoJS.AES.encrypt(jsonString, keyWordArray, {
     iv,

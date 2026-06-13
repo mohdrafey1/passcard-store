@@ -35,11 +35,20 @@ export default function PasswordDetailScreen() {
 
   async function loadEntry() {
     if (!id) return;
-    const e = await passwordRepository.findById(id);
-    if (e) {
-      setEntry(e);
-      setTitle(e.title); setWebsite(e.website); setUsername(e.username);
-      setEmail(e.email); setPassword(e.password); setNotes(e.notes); setCategory(e.category);
+    try {
+      const e = await passwordRepository.findById(id);
+      if (e) {
+        setEntry(e);
+        setTitle(e.title); setWebsite(e.website); setUsername(e.username);
+        setEmail(e.email); setPassword(e.password); setNotes(e.notes); setCategory(e.category);
+      } else {
+        Alert.alert('Error', 'Password not found');
+        router.back();
+      }
+    } catch (e: any) {
+      console.error('Failed to load password:', e);
+      Alert.alert('Error', `Failed to open password: ${e?.message || 'Unknown error'}`);
+      router.back();
     }
   }
 

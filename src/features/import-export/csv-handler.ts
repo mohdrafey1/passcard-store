@@ -5,7 +5,7 @@ import type { PasswordEntry } from '@/types/password';
 import type { CardEntry } from '@/types/card';
 import { passwordRepository } from '@/storage/password-repository';
 import { cardRepository } from '@/storage/card-repository';
-import { v4 as uuidv4 } from 'uuid';
+import * as ExpoCrypto from 'expo-crypto';
 
 export interface ImportResult {
   imported: number;
@@ -124,7 +124,7 @@ export async function importPasswordsFromCSV(csvContent: string): Promise<Import
 
       const now = new Date().toISOString();
       toImport.push({
-        id: uuidv4(),
+        id: ExpoCrypto.randomUUID(),
         title,
         website: (row.website || '').trim(),
         username: (row.username || '').trim(),
@@ -199,7 +199,7 @@ export async function importCardsFromCSV(csvContent: string): Promise<ImportResu
 
       const now = new Date().toISOString();
       toImport.push({
-        id: uuidv4(),
+        id: ExpoCrypto.randomUUID(),
         cardHolderName,
         cardNumber,
         expiryMonth: (row.expiryMonth || '').trim(),
