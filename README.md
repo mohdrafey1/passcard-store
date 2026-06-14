@@ -1,4 +1,7 @@
-# 🔐 Passcard Store
+> 🎉 **Passcard Store is now Open Source!**
+> > This project is licensed under the [MIT License](./LICENSE) and is open for contributions from the community. Feel free to fork, star, and submit pull requests!
+
+ # 🔐 Passcard Store
 
 A production-grade, fully offline secure vault for passwords and cards — built with Expo SDK 56, React Native, and TypeScript.
 
