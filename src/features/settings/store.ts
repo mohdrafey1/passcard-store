@@ -3,6 +3,7 @@ import type { AppSettings, AutoLockDuration, ClipboardClearDuration } from '@/ty
 import { DEFAULT_SETTINGS } from '@/types/settings';
 import { loadSettings, saveSetting, deleteAllSettings } from '@/storage/settings-storage';
 import { isPinSetup } from '@/security/pin';
+import { enableBiometricKey, disableBiometricKey } from '@/security/key-manager';
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -50,6 +51,13 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   },
 
   setBiometrics: async (enabled: boolean) => {
+    // Provision (or remove) the biometric-accessible copy of the data key so
+    // biometric unlock can recover it without the PIN.
+    if (enabled) {
+      await enableBiometricKey();
+    } else {
+      await disableBiometricKey();
+    }
     await saveSetting('biometricsEnabled', enabled);
     set({ biometricsEnabled: enabled });
   },

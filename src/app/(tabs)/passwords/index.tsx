@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,6 +10,7 @@ import EmptyState from '@/components/EmptyState';
 import ActionSheet, { type SheetAction } from '@/components/ActionSheet';
 import { usePasswordStore } from '@/features/passwords/store';
 import { copyToClipboard } from '@/utils/clipboard';
+import { showToast } from '@/utils/toast';
 import { sharePassword } from '@/utils/share';
 import { CATEGORY_ICONS, DEFAULT_CATEGORIES } from '@/constants/categories';
 import { useSettingsStore } from '@/features/settings/store';
@@ -30,7 +31,14 @@ export default function PasswordListScreen() {
     } else {
       load();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch]);
+
+  // Keep the field in sync when arriving from the dashboard with a new query
+  // (params.search changes on each navigation).
+  useEffect(() => {
+    if (params.search !== undefined) setSearchQuery(params.search);
+  }, [params.search]);
 
   // Reload from the database whenever the screen regains focus (e.g. after
   // adding, editing or deleting an entry on another screen). The list screen
@@ -42,7 +50,13 @@ export default function PasswordListScreen() {
     }, [debouncedSearch]),
   );
 
-  const filtered = usePasswordStore((s) => s.getFiltered)();
+  // Text search is already applied by the store (search results live in
+  // `passwords`); here we only layer on the category filter. Computing it with
+  // useMemo avoids the fragile "call the selector" pattern.
+  const filtered = useMemo(() => {
+    if (selectedCategory === 'All') return passwords;
+    return passwords.filter((p) => p.category === selectedCategory);
+  }, [passwords, selectedCategory]);
 
   const confirmDelete = useCallback((item: PasswordEntry) => {
     Alert.alert('Delete Password', `Delete "${item.title}"? This cannot be undone.`, [
@@ -53,12 +67,12 @@ export default function PasswordListScreen() {
 
   const actionItemActions: SheetAction[] = actionItem
     ? [
-        { label: 'Copy Password', icon: 'key-outline', onPress: () => copyToClipboard(actionItem.password, clipboardDuration) },
+        { label: 'Copy Password', icon: 'key-outline', onPress: () => { copyToClipboard(actionItem.password, clipboardDuration); showToast('Password copied'); } },
         ...(actionItem.email
-          ? [{ label: 'Copy Email', icon: 'mail-outline', onPress: () => copyToClipboard(actionItem.email, clipboardDuration) } as SheetAction]
+          ? [{ label: 'Copy Email', icon: 'mail-outline', onPress: () => { copyToClipboard(actionItem.email, clipboardDuration); showToast('Email copied'); } } as SheetAction]
           : []),
         ...(actionItem.username
-          ? [{ label: 'Copy Username', icon: 'person-outline', onPress: () => copyToClipboard(actionItem.username, clipboardDuration) } as SheetAction]
+          ? [{ label: 'Copy Username', icon: 'person-outline', onPress: () => { copyToClipboard(actionItem.username, clipboardDuration); showToast('Username copied'); } } as SheetAction]
           : []),
         { label: 'Share', icon: 'share-outline', onPress: () => sharePassword(actionItem) },
         { label: 'Duplicate', icon: 'copy-outline', onPress: () => duplicate(actionItem.id) },
@@ -86,6 +100,8 @@ export default function PasswordListScreen() {
         <TouchableOpacity
           style={styles.addButton}
           onPress={() => router.push('/(tabs)/passwords/add')}
+          accessibilityRole="button"
+          accessibilityLabel="Add password"
         >
           <Ionicons name="add" size={24} color={Colors.white} />
         </TouchableOpacity>
@@ -106,6 +122,9 @@ export default function PasswordListScreen() {
           <TouchableOpacity
             style={[styles.categoryPill, selectedCategory === cat && styles.categoryPillActive]}
             onPress={() => setCategory(cat as PasswordCategory | 'All')}
+            accessibilityRole="button"
+            accessibilityState={{ selected: selectedCategory === cat }}
+            accessibilityLabel={`Filter by ${cat}`}
           >
             <Text style={[styles.categoryText, selectedCategory === cat && styles.categoryTextActive]}>
               {cat}
@@ -123,11 +142,17 @@ export default function PasswordListScreen() {
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
-          <EmptyState
-            icon="key-outline"
-            title="No passwords yet"
-            subtitle="Tap + to add your first password"
-          />
+          loading ? (
+            <View style={styles.loadingBox}>
+              <ActivityIndicator size="large" color={Colors.primary} />
+            </View>
+          ) : (
+            <EmptyState
+              icon="key-outline"
+              title={debouncedSearch ? 'No matches found' : 'No passwords yet'}
+              subtitle={debouncedSearch ? 'Try a different search' : 'Tap + to add your first password'}
+            />
+          )
         }
       />
 
@@ -172,4 +197,5 @@ const styles = StyleSheet.create({
   categoryTextActive: { color: Colors.white },
   list: { flex: 1 },
   listContent: { flexGrow: 1, paddingHorizontal: Spacing.base, paddingBottom: Spacing['3xl'] },
+  loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: Spacing['4xl'] },
 });

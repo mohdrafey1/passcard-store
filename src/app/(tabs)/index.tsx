@@ -6,8 +6,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, FontSize, Spacing, BorderRadius, Shadow } from '@/constants/theme';
 import SearchBar from '@/components/SearchBar';
 import VaultCard from '@/components/VaultCard';
-import { usePasswordStore } from '@/features/passwords/store';
-import { useCardStore } from '@/features/cards/store';
 import { passwordRepository } from '@/storage/password-repository';
 import { cardRepository } from '@/storage/card-repository';
 import type { PasswordEntry } from '@/types/password';
@@ -25,8 +23,6 @@ export default function DashboardScreen() {
   const [passwordCount, setPasswordCount] = useState(0);
   const [cardCount, setCardCount] = useState(0);
   const [recentItems, setRecentItems] = useState<RecentItem[]>([]);
-  const loadPasswords = usePasswordStore((s) => s.load);
-  const loadCards = useCardStore((s) => s.load);
 
   // Refresh stats and recent items every time the dashboard is focused so
   // newly added or deleted entries are reflected.
@@ -37,28 +33,35 @@ export default function DashboardScreen() {
   );
 
   async function loadData() {
-    await Promise.all([loadPasswords(), loadCards()]);
-    const [pCount, cCount, recentPasswords, recentCards] = await Promise.all([
-      passwordRepository.count(),
-      cardRepository.count(),
-      passwordRepository.getRecent(3),
-      cardRepository.getRecent(3),
-    ]);
-    setPasswordCount(pCount);
-    setCardCount(cCount);
+    try {
+      // Only what the dashboard actually shows — counts and a few recents.
+      // (The list screens load their own full data on focus.)
+      const [pCount, cCount, recentPasswords, recentCards] = await Promise.all([
+        passwordRepository.count(),
+        cardRepository.count(),
+        passwordRepository.getRecent(3),
+        cardRepository.getRecent(3),
+      ]);
+      setPasswordCount(pCount);
+      setCardCount(cCount);
 
-    const combined: RecentItem[] = [
-      ...recentPasswords.map((p) => ({ type: 'password' as const, item: p, date: p.createdAt })),
-      ...recentCards.map((c) => ({ type: 'card' as const, item: c, date: c.createdAt })),
-    ];
-    combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    setRecentItems(combined.slice(0, 5));
+      const combined: RecentItem[] = [
+        ...recentPasswords.map((p) => ({ type: 'password' as const, item: p, date: p.createdAt })),
+        ...recentCards.map((c) => ({ type: 'card' as const, item: c, date: c.createdAt })),
+      ];
+      combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      setRecentItems(combined.slice(0, 5));
+    } catch (e) {
+      if (__DEV__) console.error('Failed to load dashboard data:', e);
+    }
   }
 
-  const handleSearch = (query: string) => {
-    setSearchQuery(query);
-    if (query.trim()) {
-      router.push({ pathname: '/(tabs)/passwords', params: { search: query } });
+  // Navigate to results only when the user submits the search, so the field
+  // stays usable instead of jumping away on the first keystroke.
+  const submitSearch = () => {
+    const q = searchQuery.trim();
+    if (q) {
+      router.push({ pathname: '/(tabs)/passwords', params: { search: q } });
     }
   };
 
@@ -80,7 +83,8 @@ export default function DashboardScreen() {
         <View style={styles.searchContainer}>
           <SearchBar
             value={searchQuery}
-            onChangeText={handleSearch}
+            onChangeText={setSearchQuery}
+            onSubmit={submitSearch}
             placeholder="Search passwords, cards..."
           />
         </View>

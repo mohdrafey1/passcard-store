@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,6 +9,7 @@ import PasswordStrengthIndicator from '@/components/PasswordStrengthIndicator';
 import { usePasswordStore } from '@/features/passwords/store';
 import { useSettingsStore } from '@/features/settings/store';
 import { copyToClipboard } from '@/utils/clipboard';
+import { showToast } from '@/utils/toast';
 import { sharePassword } from '@/utils/share';
 import { DEFAULT_CATEGORIES } from '@/constants/categories';
 import { passwordRepository } from '@/storage/password-repository';
@@ -46,7 +47,7 @@ export default function PasswordDetailScreen() {
         router.back();
       }
     } catch (e: any) {
-      console.error('Failed to load password:', e);
+      if (__DEV__) console.error('Failed to load password:', e);
       Alert.alert('Error', `Failed to open password: ${e?.message || 'Unknown error'}`);
       router.back();
     }
@@ -59,6 +60,17 @@ export default function PasswordDetailScreen() {
     loadEntry();
   };
 
+  const resetFields = () => {
+    if (!entry) return;
+    setTitle(entry.title); setWebsite(entry.website); setUsername(entry.username);
+    setEmail(entry.email); setPassword(entry.password); setNotes(entry.notes); setCategory(entry.category);
+  };
+
+  const handleCancelEdit = () => {
+    resetFields();
+    setEditing(false);
+  };
+
   const handleDelete = () => {
     Alert.alert('Delete Password', `Delete "${entry?.title}"?`, [
       { text: 'Cancel', style: 'cancel' },
@@ -68,7 +80,11 @@ export default function PasswordDetailScreen() {
 
   const handleCopy = (text: string, label: string) => {
     copyToClipboard(text, clipboardDuration);
-    Alert.alert('Copied', `${label} copied to clipboard`);
+    showToast(
+      clipboardDuration > 0
+        ? `${label} copied — clears in ${clipboardDuration}s`
+        : `${label} copied`,
+    );
   };
 
   if (!entry) return <View style={styles.container} />;
@@ -76,22 +92,29 @@ export default function PasswordDetailScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="chevron-back" size={24} color={Colors.text} />
-        </TouchableOpacity>
+        {editing ? (
+          <TouchableOpacity onPress={handleCancelEdit} style={styles.saveButton} accessibilityRole="button" accessibilityLabel="Cancel editing">
+            <Text style={styles.cancelText}>Cancel</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton} accessibilityRole="button" accessibilityLabel="Go back">
+            <Ionicons name="chevron-back" size={24} color={Colors.text} />
+          </TouchableOpacity>
+        )}
         <Text style={styles.headerTitle}>{editing ? 'Edit Password' : 'Password Details'}</Text>
         {editing ? (
-          <TouchableOpacity onPress={handleSave} style={styles.saveButton}>
+          <TouchableOpacity onPress={handleSave} style={styles.saveButton} accessibilityRole="button" accessibilityLabel="Save">
             <Text style={styles.saveText}>Save</Text>
           </TouchableOpacity>
         ) : (
-          <TouchableOpacity onPress={() => setEditing(true)} style={styles.saveButton}>
+          <TouchableOpacity onPress={() => setEditing(true)} style={styles.saveButton} accessibilityRole="button" accessibilityLabel="Edit">
             <Ionicons name="create-outline" size={22} color={Colors.primary} />
           </TouchableOpacity>
         )}
       </View>
 
-      <ScrollView contentContainerStyle={styles.form} showsVerticalScrollIndicator={false}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <ScrollView contentContainerStyle={styles.form} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <DetailField label="Title" value={title} onChangeText={setTitle} editing={editing} />
         <DetailField label="Website" value={website} onChangeText={setWebsite} editing={editing} onCopy={() => handleCopy(website, 'Website')} />
         <DetailField label="Username" value={username} onChangeText={setUsername} editing={editing} onCopy={() => handleCopy(username, 'Username')} />
@@ -132,6 +155,7 @@ export default function PasswordDetailScreen() {
           </View>
         )}
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -178,6 +202,7 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: FontSize.md, fontWeight: '600', color: Colors.text },
   saveButton: { padding: Spacing.xs },
   saveText: { fontSize: FontSize.base, fontWeight: '600', color: Colors.primary },
+  cancelText: { fontSize: FontSize.base, fontWeight: '600', color: Colors.textSecondary },
   form: { padding: Spacing.base, paddingBottom: Spacing['4xl'] },
   label: { fontSize: FontSize.sm, fontWeight: '600', color: Colors.textSecondary, marginBottom: Spacing.xs, textTransform: 'uppercase', letterSpacing: 0.5 },
   categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginBottom: Spacing.lg },

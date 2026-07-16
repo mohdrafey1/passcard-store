@@ -16,7 +16,9 @@ export const Colors = {
   dangerDark: '#C0392B',
   text: '#1F1712',
   textSecondary: '#6B5D4F',
-  textMuted: '#A0927F',
+  // Darkened from #A0927F to meet WCAG AA contrast for hint/placeholder text
+  // on the light background.
+  textMuted: '#7C6E5B',
   border: '#E5DDD0',
   borderLight: '#EDE7DC',
   inputBackground: '#FFFFFF',
@@ -42,6 +44,10 @@ export const Colors = {
   categoryEducation: '#6B5D4F',
   categoryOther: '#A0927F',
 };
+
+// Credit-card widget gradient (dark → darker) kept here so every card renders
+// from the same source of truth.
+export const CardGradient: [string, string, string] = ['#3D2E22', '#1F1712', '#130E0A'];
 
 export const Spacing = {
   xs: 4,

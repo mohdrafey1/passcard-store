@@ -1,24 +1,31 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Switch, StyleSheet, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import Constants from 'expo-constants';
 import { Colors, FontSize, Spacing, BorderRadius } from '@/constants/theme';
 import { useSettingsStore } from '@/features/settings/store';
 import { isBiometricAvailable, getBiometricType } from '@/security/biometrics';
-import { changePin } from '@/security/pin';
+import { verifyStoredPin, getPinLength, deletePin } from '@/security/pin';
 import { deleteDatabase } from '@/storage/database';
-import { deleteEncryptionKey } from '@/security/encryption';
-import { deletePin } from '@/security/pin';
+import { wipeKeys } from '@/security/key-manager';
 import { deleteAllSettings } from '@/storage/settings-storage';
+import ActionSheet, { type SheetAction } from '@/components/ActionSheet';
+import PinModal from '@/components/PinModal';
 import { AUTO_LOCK_OPTIONS, CLIPBOARD_CLEAR_OPTIONS } from '@/types/settings';
-import type { AutoLockDuration, ClipboardClearDuration } from '@/types/settings';
 
 function SettingRow({ icon, label, value, onPress, danger }: {
   icon: string; label: string; value?: string; onPress?: () => void; danger?: boolean;
 }) {
   return (
-    <TouchableOpacity style={styles.settingRow} onPress={onPress} activeOpacity={0.7}>
+    <TouchableOpacity
+      style={styles.settingRow}
+      onPress={onPress}
+      activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityLabel={value ? `${label}, ${value}` : label}
+    >
       <View style={[styles.settingIcon, danger && { backgroundColor: Colors.danger + '15' }]}>
         <Ionicons name={icon as any} size={20} color={danger ? Colors.danger : Colors.primary} />
       </View>
@@ -43,6 +50,7 @@ function SettingToggle({ icon, label, value, onToggle }: {
         onValueChange={onToggle}
         trackColor={{ false: Colors.border, true: Colors.primary }}
         thumbColor={Colors.white}
+        accessibilityLabel={label}
       />
     </View>
   );
@@ -51,9 +59,14 @@ function SettingToggle({ icon, label, value, onToggle }: {
 export default function SettingsScreen() {
   const settings = useSettingsStore();
   const [biometricType, setBiometricType] = useState('Biometric');
+  const [pinLength, setPinLength] = useState<4 | 6>(4);
+  const [picker, setPicker] = useState<'autolock' | 'clipboard' | null>(null);
+  const [deleteAuthVisible, setDeleteAuthVisible] = useState(false);
+  const [pinError, setPinError] = useState('');
 
-  React.useEffect(() => {
+  useEffect(() => {
     getBiometricType().then(setBiometricType);
+    getPinLength().then(setPinLength);
   }, []);
 
   const handleBiometricsToggle = async (enabled: boolean) => {
@@ -64,42 +77,38 @@ export default function SettingsScreen() {
         return;
       }
     }
-    await settings.setBiometrics(enabled);
+    try {
+      await settings.setBiometrics(enabled);
+    } catch {
+      Alert.alert('Error', 'Could not update biometric setting.');
+    }
   };
 
-  const handleChangePin = () => {
-    Alert.prompt?.('Change PIN', 'Enter new PIN (4 or 6 digits)', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Change',
-        onPress: async (pin?: string) => {
-          if (pin && (pin.length === 4 || pin.length === 6) && /^\d+$/.test(pin)) {
-            await changePin(pin);
-            Alert.alert('Success', 'PIN changed successfully');
-          } else {
-            Alert.alert('Error', 'PIN must be 4 or 6 digits');
-          }
-        },
-      },
-    ]) ?? router.push('/(auth)/create-pin');
-  };
+  // ---- Pickers (replaces multi-button Alert menus that break on Android) ----
+  const autoLockActions: SheetAction[] = AUTO_LOCK_OPTIONS.map((opt) => ({
+    label: opt.label,
+    icon: settings.autoLockDuration === opt.value ? 'checkmark-circle' : 'ellipse-outline',
+    onPress: () => settings.setAutoLockDuration(opt.value),
+  }));
 
-  const handleAutoLock = () => {
-    const options = AUTO_LOCK_OPTIONS.map((opt) => ({
-      text: `${opt.label}${settings.autoLockDuration === opt.value ? ' ✓' : ''}`,
-      onPress: () => settings.setAutoLockDuration(opt.value),
-    }));
-    options.push({ text: 'Cancel', onPress: async () => {} });
-    Alert.alert('Auto Lock', 'Lock after going to background', options);
-  };
+  const clipboardActions: SheetAction[] = CLIPBOARD_CLEAR_OPTIONS.map((opt) => ({
+    label: opt.label,
+    icon: settings.clipboardClearDuration === opt.value ? 'checkmark-circle' : 'ellipse-outline',
+    onPress: () => settings.setClipboardClearDuration(opt.value),
+  }));
 
-  const handleClipboardClear = () => {
-    const options = CLIPBOARD_CLEAR_OPTIONS.map((opt) => ({
-      text: `${opt.label}${settings.clipboardClearDuration === opt.value ? ' ✓' : ''}`,
-      onPress: () => settings.setClipboardClearDuration(opt.value),
-    }));
-    options.push({ text: 'Cancel', onPress: async () => {} });
-    Alert.alert('Clipboard Clear', 'Clear clipboard after copying', options);
+  // ---- Delete all (requires PIN re-authentication) ----
+  const performWipe = async () => {
+    try {
+      await deleteDatabase();
+      await wipeKeys();
+      await deletePin();
+      await deleteAllSettings();
+      await settings.resetAll();
+      router.replace('/');
+    } catch {
+      Alert.alert('Error', 'Failed to delete data');
+    }
   };
 
   const handleDeleteAll = () => {
@@ -109,27 +118,30 @@ export default function SettingsScreen() {
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Delete Everything',
+          text: 'Continue',
           style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteDatabase();
-              await deleteEncryptionKey();
-              await deletePin();
-              await deleteAllSettings();
-              await settings.resetAll();
-              router.replace('/');
-            } catch (e) {
-              Alert.alert('Error', 'Failed to delete data');
-            }
+          onPress: () => {
+            setPinError('');
+            setDeleteAuthVisible(true);
           },
         },
       ],
     );
   };
 
+  const handleDeleteAuth = async (pin: string) => {
+    const ok = await verifyStoredPin(pin);
+    if (!ok) {
+      setPinError('Incorrect PIN.');
+      return;
+    }
+    setDeleteAuthVisible(false);
+    await performWipe();
+  };
+
   const autoLockLabel = AUTO_LOCK_OPTIONS.find((o) => o.value === settings.autoLockDuration)?.label || 'Immediate';
   const clipboardLabel = CLIPBOARD_CLEAR_OPTIONS.find((o) => o.value === settings.clipboardClearDuration)?.label || '30 seconds';
+  const appVersion = Constants.expoConfig?.version ?? '1.0.0';
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -137,10 +149,10 @@ export default function SettingsScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <Text style={styles.sectionTitle}>Security</Text>
         <View style={styles.section}>
-          <SettingRow icon="key-outline" label="Change PIN" onPress={handleChangePin} />
+          <SettingRow icon="key-outline" label="Change PIN" onPress={() => router.push('/(tabs)/settings/change-pin')} />
           <SettingToggle icon="finger-print" label={`${biometricType} Unlock`} value={settings.biometricsEnabled} onToggle={handleBiometricsToggle} />
-          <SettingRow icon="time-outline" label="Auto Lock" value={autoLockLabel} onPress={handleAutoLock} />
-          <SettingRow icon="clipboard-outline" label="Clipboard Clear" value={clipboardLabel} onPress={handleClipboardClear} />
+          <SettingRow icon="time-outline" label="Auto Lock" value={autoLockLabel} onPress={() => setPicker('autolock')} />
+          <SettingRow icon="clipboard-outline" label="Clipboard Clear" value={clipboardLabel} onPress={() => setPicker('clipboard')} />
         </View>
 
         <Text style={styles.sectionTitle}>Data</Text>
@@ -155,8 +167,33 @@ export default function SettingsScreen() {
           <SettingRow icon="trash-outline" label="Delete All Data" onPress={handleDeleteAll} danger />
         </View>
 
-        <Text style={styles.version}>Passcard Store v1.0.0</Text>
+        <Text style={styles.version}>Passcard Store v{appVersion}</Text>
       </ScrollView>
+
+      <ActionSheet
+        visible={picker === 'autolock'}
+        onClose={() => setPicker(null)}
+        title="Auto Lock"
+        subtitle="Lock after going to background"
+        actions={autoLockActions}
+      />
+      <ActionSheet
+        visible={picker === 'clipboard'}
+        onClose={() => setPicker(null)}
+        title="Clipboard Clear"
+        subtitle="Clear clipboard after copying"
+        actions={clipboardActions}
+      />
+
+      <PinModal
+        visible={deleteAuthVisible}
+        pinLength={pinLength}
+        title="Confirm Your PIN"
+        subtitle="Enter your PIN to delete all data"
+        error={pinError}
+        onComplete={handleDeleteAuth}
+        onClose={() => setDeleteAuthVisible(false)}
+      />
     </SafeAreaView>
   );
 }

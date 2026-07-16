@@ -1,8 +1,11 @@
 import * as ExpoCrypto from 'expo-crypto';
 import CryptoJS from 'crypto-js';
-import * as SecureStore from 'expo-secure-store';
 
-const ENCRYPTION_KEY_STORAGE = 'VAULT_ENCRYPTION_KEY';
+/**
+ * Low-level cryptographic primitives. Key storage and the PIN-wrapped data key
+ * live in `key-manager.ts`; this module only knows how to generate a key and
+ * encrypt/decrypt with it.
+ */
 
 /**
  * Generate a random 256-bit encryption key using expo-crypto
@@ -12,33 +15,6 @@ export function generateEncryptionKey(): string {
   return Array.from(randomBytes)
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
-}
-
-/**
- * Store the encryption key securely in expo-secure-store
- */
-export async function storeEncryptionKey(key: string): Promise<void> {
-  await SecureStore.setItemAsync(ENCRYPTION_KEY_STORAGE, key);
-}
-
-/**
- * Retrieve the encryption key from expo-secure-store
- */
-export async function getEncryptionKey(): Promise<string | null> {
-  return await SecureStore.getItemAsync(ENCRYPTION_KEY_STORAGE);
-}
-
-/**
- * Initialize encryption key if not already present
- * Returns the key (existing or newly created)
- */
-export async function initializeEncryptionKey(): Promise<string> {
-  let key = await getEncryptionKey();
-  if (!key) {
-    key = generateEncryptionKey();
-    await storeEncryptionKey(key);
-  }
-  return key;
 }
 
 /**
@@ -86,11 +62,4 @@ export function decrypt(cipherText: string, key: string): string {
     padding: CryptoJS.pad.Pkcs7,
   });
   return decrypted.toString(CryptoJS.enc.Utf8);
-}
-
-/**
- * Delete the encryption key (used during full data wipe)
- */
-export async function deleteEncryptionKey(): Promise<void> {
-  await SecureStore.deleteItemAsync(ENCRYPTION_KEY_STORAGE);
 }

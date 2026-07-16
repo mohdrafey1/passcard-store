@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, Alert, KeyboardAvoidingView, Platform, type KeyboardTypeOptions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,6 +7,7 @@ import { Colors, FontSize, Spacing, BorderRadius } from '@/constants/theme';
 import { useCardStore } from '@/features/cards/store';
 import { useSettingsStore } from '@/features/settings/store';
 import { copyToClipboard } from '@/utils/clipboard';
+import { showToast } from '@/utils/toast';
 import { shareCard } from '@/utils/share';
 import { cardRepository } from '@/storage/card-repository';
 import type { CardEntry } from '@/types/card';
@@ -29,31 +30,46 @@ export default function CardDetailScreen() {
 
   useEffect(() => { loadEntry(); }, [id]);
 
+  function applyEntry(e: CardEntry) {
+    setCardHolderName(e.cardHolderName); setCardNumber(e.cardNumber);
+    setExpiryMonth(e.expiryMonth); setExpiryYear(e.expiryYear);
+    setCvv(e.cvv); setCardNickname(e.cardNickname); setNotes(e.notes);
+  }
+
   async function loadEntry() {
     if (!id) return;
     try {
       const e = await cardRepository.findById(id);
       if (e) {
         setEntry(e);
-        setCardHolderName(e.cardHolderName); setCardNumber(e.cardNumber);
-        setExpiryMonth(e.expiryMonth); setExpiryYear(e.expiryYear);
-        setCvv(e.cvv); setCardNickname(e.cardNickname); setNotes(e.notes);
+        applyEntry(e);
       } else {
         Alert.alert('Error', 'Card not found');
         router.back();
       }
     } catch (e: any) {
-      console.error('Failed to load card:', e);
+      if (__DEV__) console.error('Failed to load card:', e);
       Alert.alert('Error', `Failed to open card: ${e?.message || 'Unknown error'}`);
       router.back();
     }
   }
 
   const handleSave = async () => {
-    if (!id || !cardHolderName.trim() || !cardNumber.trim()) { Alert.alert('Error', 'Required fields missing'); return; }
+    if (!id || !cardHolderName.trim() || !cardNumber.trim()) {
+      Alert.alert('Error', 'Card holder name and number are required'); return;
+    }
+    const month = parseInt(expiryMonth, 10);
+    if (Number.isNaN(month) || month < 1 || month > 12) {
+      Alert.alert('Error', 'Expiry month must be between 01 and 12'); return;
+    }
     await updateCard(id, { cardHolderName, cardNumber: cardNumber.replace(/\s/g, ''), expiryMonth, expiryYear, cvv, cardNickname, notes });
     setEditing(false);
     loadEntry();
+  };
+
+  const handleCancelEdit = () => {
+    if (entry) applyEntry(entry);
+    setEditing(false);
   };
 
   const handleDelete = () => {
@@ -65,75 +81,106 @@ export default function CardDetailScreen() {
 
   const handleCopy = (text: string, label: string) => {
     copyToClipboard(text, clipboardDuration);
-    Alert.alert('Copied', `${label} copied`);
+    showToast(
+      clipboardDuration > 0 ? `${label} copied — clears in ${clipboardDuration}s` : `${label} copied`,
+    );
   };
 
-  if (!entry) return <View style={styles.container} />;
+  if (!entry) {
+    return <View style={styles.container} />;
+  }
 
-  const maskValue = (val: string) => revealed ? val : '•'.repeat(val.length);
   const maskedCardNumber = revealed ? cardNumber.replace(/(.{4})/g, '$1 ').trim() : `•••• •••• •••• ${cardNumber.slice(-4)}`;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="chevron-back" size={24} color={Colors.text} />
-        </TouchableOpacity>
+        {editing ? (
+          <TouchableOpacity onPress={handleCancelEdit} accessibilityRole="button" accessibilityLabel="Cancel editing">
+            <Text style={styles.cancelText}>Cancel</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Go back">
+            <Ionicons name="chevron-back" size={24} color={Colors.text} />
+          </TouchableOpacity>
+        )}
         <Text style={styles.headerTitle}>{editing ? 'Edit Card' : 'Card Details'}</Text>
         {editing ? (
-          <TouchableOpacity onPress={handleSave}><Text style={styles.saveText}>Save</Text></TouchableOpacity>
+          <TouchableOpacity onPress={handleSave} accessibilityRole="button" accessibilityLabel="Save"><Text style={styles.saveText}>Save</Text></TouchableOpacity>
         ) : (
-          <TouchableOpacity onPress={() => setEditing(true)}><Ionicons name="create-outline" size={22} color={Colors.primary} /></TouchableOpacity>
+          <TouchableOpacity onPress={() => setEditing(true)} accessibilityRole="button" accessibilityLabel="Edit"><Ionicons name="create-outline" size={22} color={Colors.primary} /></TouchableOpacity>
         )}
       </View>
 
-      <ScrollView contentContainerStyle={styles.form} showsVerticalScrollIndicator={false}>
-        {!editing && (
-          <TouchableOpacity onPress={() => setRevealed(!revealed)} style={styles.revealButton}>
-            <Ionicons name={revealed ? 'eye-off' : 'eye'} size={18} color={Colors.primary} />
-            <Text style={styles.revealText}>{revealed ? 'Hide' : 'Reveal'} Details</Text>
-          </TouchableOpacity>
-        )}
-
-        <DetailRow label="Nickname" value={editing ? cardNickname : (cardNickname || 'Not set')} editing={editing} onChangeText={setCardNickname} />
-        <DetailRow label="Card Holder" value={editing ? cardHolderName : cardHolderName} editing={editing} onChangeText={setCardHolderName} />
-        <DetailRow label="Card Number" value={editing ? cardNumber : maskedCardNumber} editing={editing} onChangeText={setCardNumber} onCopy={!editing ? () => handleCopy(cardNumber, 'Card Number') : undefined} mono />
-        <View style={styles.row}>
-          <DetailRow label="Month" value={editing ? expiryMonth : (revealed ? expiryMonth : '••')} editing={editing} onChangeText={setExpiryMonth} half />
-          <DetailRow label="Year" value={editing ? expiryYear : (revealed ? expiryYear : '••')} editing={editing} onChangeText={setExpiryYear} half />
-          <DetailRow label="CVV" value={editing ? cvv : maskValue(cvv)} editing={editing} onChangeText={setCvv} onCopy={!editing ? () => handleCopy(cvv, 'CVV') : undefined} half secure={editing} />
-        </View>
-        <DetailRow label="Notes" value={editing ? notes : (notes || 'No notes')} editing={editing} onChangeText={setNotes} multiline />
-
-        {!editing && (
-          <View style={styles.actions}>
-            <TouchableOpacity style={styles.actionBtn} onPress={() => entry && shareCard(entry)}>
-              <Ionicons name="share-outline" size={20} color={Colors.primary} />
-              <Text style={styles.actionText}>Share</Text>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <ScrollView contentContainerStyle={styles.form} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          {!editing && (
+            <TouchableOpacity onPress={() => setRevealed(!revealed)} style={styles.revealButton} accessibilityRole="button" accessibilityLabel={revealed ? 'Hide card details' : 'Reveal card details'}>
+              <Ionicons name={revealed ? 'eye-off' : 'eye'} size={18} color={Colors.primary} />
+              <Text style={styles.revealText}>{revealed ? 'Hide' : 'Reveal'} Details</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.actionBtn, styles.dangerBtn]} onPress={handleDelete}>
-              <Ionicons name="trash-outline" size={20} color={Colors.danger} />
-              <Text style={[styles.actionText, { color: Colors.danger }]}>Delete</Text>
-            </TouchableOpacity>
+          )}
+
+          <DetailRow label="Nickname" value={editing ? cardNickname : (cardNickname || 'Not set')} editing={editing} onChangeText={setCardNickname} />
+          <DetailRow label="Card Holder" value={cardHolderName} editing={editing} onChangeText={setCardHolderName} autoCapitalize="words" />
+          <DetailRow
+            label="Card Number"
+            value={editing ? cardNumber : maskedCardNumber}
+            editing={editing}
+            onChangeText={(t) => setCardNumber(t.replace(/\D/g, '').slice(0, 16))}
+            onCopy={!editing ? () => handleCopy(cardNumber, 'Card Number') : undefined}
+            mono
+            keyboardType="number-pad"
+            maxLength={16}
+          />
+          <View style={styles.row}>
+            <DetailRow label="Month" value={editing ? expiryMonth : (revealed ? expiryMonth : '••')} editing={editing} onChangeText={(t) => setExpiryMonth(t.replace(/\D/g, '').slice(0, 2))} half keyboardType="number-pad" maxLength={2} />
+            <DetailRow label="Year" value={editing ? expiryYear : (revealed ? expiryYear : '••')} editing={editing} onChangeText={(t) => setExpiryYear(t.replace(/\D/g, '').slice(0, 2))} half keyboardType="number-pad" maxLength={2} />
+            <DetailRow label="CVV" value={editing ? cvv : (revealed ? cvv : '•••')} editing={editing} onChangeText={(t) => setCvv(t.replace(/\D/g, '').slice(0, 4))} onCopy={!editing ? () => handleCopy(cvv, 'CVV') : undefined} half secure keyboardType="number-pad" maxLength={4} />
           </View>
-        )}
-      </ScrollView>
+          <DetailRow label="Notes" value={editing ? notes : (notes || 'No notes')} editing={editing} onChangeText={setNotes} multiline />
+
+          {!editing && (
+            <View style={styles.actions}>
+              <TouchableOpacity style={styles.actionBtn} onPress={() => entry && shareCard(entry)} accessibilityRole="button" accessibilityLabel="Share card">
+                <Ionicons name="share-outline" size={20} color={Colors.primary} />
+                <Text style={styles.actionText}>Share</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.actionBtn, styles.dangerBtn]} onPress={handleDelete} accessibilityRole="button" accessibilityLabel="Delete card">
+                <Ionicons name="trash-outline" size={20} color={Colors.danger} />
+                <Text style={[styles.actionText, { color: Colors.danger }]}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
-function DetailRow({ label, value, editing, onChangeText, onCopy, multiline, mono, half, secure }: {
+function DetailRow({ label, value, editing, onChangeText, onCopy, multiline, mono, half, secure, keyboardType, maxLength, autoCapitalize }: {
   label: string; value: string; editing: boolean; onChangeText?: (t: string) => void;
   onCopy?: () => void; multiline?: boolean; mono?: boolean; half?: boolean; secure?: boolean;
+  keyboardType?: KeyboardTypeOptions; maxLength?: number; autoCapitalize?: 'none' | 'words' | 'sentences' | 'characters';
 }) {
   return (
     <View style={[drStyles.container, half && drStyles.half]}>
       <View style={drStyles.labelRow}>
         <Text style={drStyles.label}>{label}</Text>
-        {onCopy && <TouchableOpacity onPress={onCopy}><Ionicons name="copy-outline" size={14} color={Colors.textSecondary} /></TouchableOpacity>}
+        {onCopy && <TouchableOpacity onPress={onCopy} accessibilityRole="button" accessibilityLabel={`Copy ${label}`}><Ionicons name="copy-outline" size={14} color={Colors.textSecondary} /></TouchableOpacity>}
       </View>
       {editing ? (
-        <TextInput style={[drStyles.input, multiline && drStyles.multiline, mono && drStyles.mono]} value={value} onChangeText={onChangeText} placeholderTextColor={Colors.textMuted} multiline={multiline} secureTextEntry={secure} />
+        <TextInput
+          style={[drStyles.input, multiline && drStyles.multiline, mono && drStyles.mono]}
+          value={value}
+          onChangeText={onChangeText}
+          placeholderTextColor={Colors.textMuted}
+          multiline={multiline}
+          secureTextEntry={secure}
+          keyboardType={keyboardType}
+          maxLength={maxLength}
+          autoCapitalize={autoCapitalize}
+        />
       ) : (
         <Text style={[drStyles.value, mono && drStyles.mono, !value && drStyles.empty]}>{value}</Text>
       )}
@@ -158,6 +205,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.base, paddingVertical: Spacing.sm },
   headerTitle: { fontSize: FontSize.md, fontWeight: '600', color: Colors.text },
   saveText: { fontSize: FontSize.base, fontWeight: '600', color: Colors.primary },
+  cancelText: { fontSize: FontSize.base, fontWeight: '600', color: Colors.textSecondary },
   form: { padding: Spacing.base, paddingBottom: Spacing['4xl'] },
   revealButton: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.lg, alignSelf: 'flex-start' },
   revealText: { fontSize: FontSize.sm, fontWeight: '600', color: Colors.primary },

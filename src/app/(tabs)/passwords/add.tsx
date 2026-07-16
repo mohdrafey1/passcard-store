@@ -21,6 +21,7 @@ export default function AddPasswordScreen() {
   const [notes, setNotes] = useState('');
   const [category, setCategory] = useState<PasswordCategory>('Personal');
   const [saving, setSaving] = useState(false);
+  const [revealSignal, setRevealSignal] = useState(0);
 
   const handleSave = async () => {
     if (!title.trim()) { Alert.alert('Error', 'Title is required'); return; }
@@ -31,7 +32,7 @@ export default function AddPasswordScreen() {
       await addPassword({ title, website: website || '', username: username || '', email: email || '', password, notes: notes || '', category });
       router.back();
     } catch (e: any) {
-      console.error('Password save error:', e);
+      if (__DEV__) console.error('Password save error:', e);
       Alert.alert('Error', `Failed to save password: ${e?.message || 'Unknown error'}`);
     } finally {
       setSaving(false);
@@ -40,28 +41,30 @@ export default function AddPasswordScreen() {
 
   const handleGenerate = () => {
     setPassword(generatePassword({ length: 20, includeLowercase: true, includeUppercase: true, includeNumbers: true, includeSymbols: true }));
+    // Reveal the generated password so the user can see what was created.
+    setRevealSignal((n) => n + 1);
   };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton} accessibilityRole="button" accessibilityLabel="Go back">
           <Ionicons name="chevron-back" size={24} color={Colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Add Password</Text>
-        <TouchableOpacity onPress={handleSave} disabled={saving} style={styles.saveButton}>
+        <TouchableOpacity onPress={handleSave} disabled={saving} style={styles.saveButton} accessibilityRole="button" accessibilityLabel="Save password">
           <Text style={[styles.saveText, saving && { opacity: 0.5 }]}>Save</Text>
         </TouchableOpacity>
       </View>
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView contentContainerStyle={styles.form} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-        <InputField label="Title *" value={title} onChangeText={setTitle} placeholder="e.g. Gmail" />
+        <InputField label="Title *" value={title} onChangeText={setTitle} placeholder="e.g. Gmail" autoFocus />
         <InputField label="Website" value={website} onChangeText={setWebsite} placeholder="e.g. gmail.com" keyboardType="url" autoCapitalize="none" />
         <InputField label="Username" value={username} onChangeText={setUsername} placeholder="e.g. johndoe" autoCapitalize="none" />
         <InputField label="Email" value={email} onChangeText={setEmail} placeholder="e.g. john@gmail.com" keyboardType="email-address" autoCapitalize="none" />
 
-        <SecureField label="Password *" value={password} onChangeText={setPassword} placeholder="Enter password" mono />
+        <SecureField label="Password *" value={password} onChangeText={setPassword} placeholder="Enter password" mono revealSignal={revealSignal} />
         <PasswordStrengthIndicator password={password} />
         <TouchableOpacity style={styles.generateButton} onPress={handleGenerate}>
           <Ionicons name="dice-outline" size={18} color={Colors.primary} />

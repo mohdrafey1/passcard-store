@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -8,51 +8,50 @@ import { Colors, FontSize, Spacing, BorderRadius } from '@/constants/theme';
 import { createBackup, shareBackup, restoreBackup } from '@/features/import-export/backup-handler';
 import { usePasswordStore } from '@/features/passwords/store';
 import { useCardStore } from '@/features/cards/store';
+import { useSettingsStore } from '@/features/settings/store';
+import { verifyStoredPin, getPinLength } from '@/security/pin';
+import { cleanupTempFile } from '@/utils/cache';
+import PinModal from '@/components/PinModal';
 
 export default function BackupScreen() {
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState<'menu' | 'restore-pin'>('menu');
   const [restoreUri, setRestoreUri] = useState('');
   const [pin, setPin] = useState('');
+  const [pinLength, setPinLength] = useState<4 | 6>(4);
+  const [createPinVisible, setCreatePinVisible] = useState(false);
+  const [pinError, setPinError] = useState('');
   const loadPasswords = usePasswordStore((s) => s.load);
   const loadCards = useCardStore((s) => s.load);
+  const loadSettings = useSettingsStore((s) => s.loadSettings);
 
-  const handleCreateBackup = async () => {
-    Alert.prompt?.('Backup PIN', 'Enter your PIN to encrypt the backup', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Create',
-        onPress: async (inputPin?: string) => {
-          if (!inputPin || inputPin.length < 4) {
-            Alert.alert('Error', 'Valid PIN required');
-            return;
-          }
-          setLoading(true);
-          try {
-            const fileUri = await createBackup(inputPin);
-            await shareBackup(fileUri);
-            Alert.alert('Success', 'Backup created and shared');
-          } catch (e: any) {
-            Alert.alert('Error', e.message || 'Backup failed');
-          } finally {
-            setLoading(false);
-          }
-        },
-      },
-    ]) ?? handleCreateBackupFallback();
+  useEffect(() => {
+    getPinLength().then(setPinLength);
+  }, []);
+
+  const handleCreateBackup = () => {
+    setPinError('');
+    setCreatePinVisible(true);
   };
 
-  const handleCreateBackupFallback = async () => {
-    // Fallback for Android which doesn't have Alert.prompt
+  const handleCreateWithPin = async (inputPin: string) => {
+    const ok = await verifyStoredPin(inputPin);
+    if (!ok) {
+      setPinError('Incorrect PIN.');
+      return;
+    }
+    setCreatePinVisible(false);
     setLoading(true);
+    let fileUri: string | null = null;
     try {
-      // Use a simple 4-digit default for now, or we could use the stored PIN
-      const fileUri = await createBackup('0000');
+      fileUri = await createBackup(inputPin);
       await shareBackup(fileUri);
-      Alert.alert('Success', 'Backup created (encrypted with PIN: 0000)');
+      Alert.alert('Backup Created', 'Your encrypted backup was created. Keep it somewhere safe — you will need this same PIN to restore it.');
     } catch (e: any) {
       Alert.alert('Error', e.message || 'Backup failed');
     } finally {
+      // Remove the plaintext-on-disk backup file from cache once shared.
+      if (fileUri) cleanupTempFile(fileUri);
       setLoading(false);
     }
   };
@@ -68,22 +67,20 @@ export default function BackupScreen() {
         return;
       }
       setRestoreUri(uri);
+      setPin('');
       setMode('restore-pin');
     } catch (e) {
       Alert.alert('Error', 'Failed to pick file');
     }
   };
 
-  const handleRestore = async () => {
-    if (!pin || pin.length < 4) {
-      Alert.alert('Error', 'Enter the PIN used to create the backup');
-      return;
-    }
+  const doRestore = async () => {
     setLoading(true);
     try {
       const result = await restoreBackup(restoreUri, pin);
       await loadPasswords();
       await loadCards();
+      await loadSettings();
       Alert.alert('Restored', `${result.passwords} passwords and ${result.cards} cards restored.`);
       setMode('menu');
       setPin('');
@@ -95,10 +92,25 @@ export default function BackupScreen() {
     }
   };
 
+  const handleRestore = () => {
+    if (!pin || pin.length < 4) {
+      Alert.alert('Error', 'Enter the PIN used to create the backup');
+      return;
+    }
+    Alert.alert(
+      'Replace all current data?',
+      'Restoring will permanently REPLACE all passwords and cards currently in this vault with the contents of the backup. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Replace', style: 'destructive', onPress: doRestore },
+      ],
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => { setMode('menu'); router.back(); }}>
+        <TouchableOpacity onPress={() => { setMode('menu'); router.back(); }} accessibilityLabel="Go back" accessibilityRole="button">
           <Ionicons name="chevron-back" size={24} color={Colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Backup & Restore</Text>
@@ -125,8 +137,9 @@ export default function BackupScreen() {
               keyboardType="number-pad"
               secureTextEntry
               maxLength={6}
+              accessibilityLabel="Backup PIN"
             />
-            <TouchableOpacity style={styles.restoreButton} onPress={handleRestore}>
+            <TouchableOpacity style={styles.restoreButton} onPress={handleRestore} accessibilityRole="button">
               <Text style={styles.restoreButtonText}>Restore Backup</Text>
             </TouchableOpacity>
           </View>
@@ -134,9 +147,9 @@ export default function BackupScreen() {
           <>
             <Text style={styles.description}>
               Create encrypted backups of your data.{'\n'}
-              Backups are protected with AES-256 encryption.
+              Backups are protected with AES-256 encryption and your PIN.
             </Text>
-            <TouchableOpacity style={styles.actionButton} onPress={handleCreateBackup}>
+            <TouchableOpacity style={styles.actionButton} onPress={handleCreateBackup} accessibilityRole="button" accessibilityLabel="Create backup">
               <View style={[styles.actionIcon, { backgroundColor: Colors.primary + '15' }]}>
                 <Ionicons name="cloud-upload-outline" size={28} color={Colors.primary} />
               </View>
@@ -145,18 +158,28 @@ export default function BackupScreen() {
                 <Text style={styles.actionHint}>Encrypted .vaultx file with all your data</Text>
               </View>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton} onPress={handlePickRestore}>
+            <TouchableOpacity style={styles.actionButton} onPress={handlePickRestore} accessibilityRole="button" accessibilityLabel="Restore backup">
               <View style={[styles.actionIcon, { backgroundColor: Colors.secondary + '15' }]}>
                 <Ionicons name="cloud-download-outline" size={28} color={Colors.secondary} />
               </View>
               <View style={styles.actionText}>
                 <Text style={styles.actionTitle}>Restore Backup</Text>
-                <Text style={styles.actionHint}>Import from a .vaultx backup file</Text>
+                <Text style={styles.actionHint}>Import from a .vaultx backup file (replaces current data)</Text>
               </View>
             </TouchableOpacity>
           </>
         )}
       </View>
+
+      <PinModal
+        visible={createPinVisible}
+        pinLength={pinLength}
+        title="Confirm Your PIN"
+        subtitle="Your backup will be encrypted with this PIN"
+        error={pinError}
+        onComplete={handleCreateWithPin}
+        onClose={() => setCreatePinVisible(false)}
+      />
     </SafeAreaView>
   );
 }

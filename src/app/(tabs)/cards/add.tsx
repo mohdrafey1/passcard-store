@@ -20,7 +20,11 @@ export default function AddCardScreen() {
   const handleSave = async () => {
     if (!cardHolderName.trim()) { Alert.alert('Error', 'Card holder name is required'); return; }
     if (!cardNumber.trim() || cardNumber.replace(/\s/g, '').length < 13) { Alert.alert('Error', 'Valid card number is required'); return; }
-    if (!expiryMonth.trim() || !expiryYear.trim()) { Alert.alert('Error', 'Expiry date is required'); return; }
+    const month = parseInt(expiryMonth, 10);
+    if (!expiryMonth.trim() || Number.isNaN(month) || month < 1 || month > 12) {
+      Alert.alert('Error', 'Expiry month must be between 01 and 12'); return;
+    }
+    if (!expiryYear.trim() || expiryYear.length < 2) { Alert.alert('Error', 'Expiry year is required (YY)'); return; }
     if (!cvv.trim() || cvv.length < 3) { Alert.alert('Error', 'Valid CVV is required'); return; }
 
     setSaving(true);
@@ -36,7 +40,7 @@ export default function AddCardScreen() {
       });
       router.back();
     } catch (e: any) {
-      console.error('Card save error:', e);
+      if (__DEV__) console.error('Card save error:', e);
       Alert.alert('Error', `Failed to save card: ${e?.message || 'Unknown error'}`);
     } finally {
       setSaving(false);
@@ -52,16 +56,16 @@ export default function AddCardScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton} accessibilityRole="button" accessibilityLabel="Go back">
           <Ionicons name="chevron-back" size={24} color={Colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Add Card</Text>
-        <TouchableOpacity onPress={handleSave} disabled={saving}>
+        <TouchableOpacity onPress={handleSave} disabled={saving} accessibilityRole="button" accessibilityLabel="Save card">
           <Text style={[styles.saveText, saving && { opacity: 0.5 }]}>Save</Text>
         </TouchableOpacity>
       </View>
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView contentContainerStyle={styles.form} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <InputField label="Card Nickname" value={cardNickname} onChangeText={setCardNickname} placeholder="e.g. My Visa" />
           <InputField label="Card Holder Name *" value={cardHolderName} onChangeText={setCardHolderName} placeholder="e.g. John Doe" autoCapitalize="words" />
