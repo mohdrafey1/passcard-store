@@ -1,7 +1,34 @@
+import * as ExpoCrypto from 'expo-crypto';
+
 const LOWERCASE = 'abcdefghijklmnopqrstuvwxyz';
 const UPPERCASE = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 const NUMBERS = '0123456789';
 const SYMBOLS = '!@#$%^&*()_+-=[]{}|;:,.<>?';
+
+/**
+ * Return a cryptographically secure random integer in [0, max).
+ * Uses expo-crypto's native CSPRNG with rejection sampling to avoid modulo bias.
+ * A password manager must never seed generated secrets from Math.random().
+ */
+function secureRandomInt(max: number): number {
+  if (max <= 0) return 0;
+  // Largest multiple of `max` that fits in a byte; values at or above this
+  // are rejected so every residue class is equally likely.
+  const limit = 256 - (256 % max);
+  // Draw bytes until we get one below the limit (expected < 2 iterations).
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const byte = ExpoCrypto.getRandomBytes(1)[0];
+    if (byte < limit) return byte % max;
+  }
+}
+
+/**
+ * Cryptographically secure pick of a random character from a string.
+ */
+function secureRandomChar(charset: string): string {
+  return charset[secureRandomInt(charset.length)];
+}
 
 export interface PasswordGeneratorOptions {
   length: number;
@@ -28,19 +55,19 @@ export function generatePassword(options: PasswordGeneratorOptions = DEFAULT_GEN
 
   if (options.includeLowercase) {
     charset += LOWERCASE;
-    required.push(LOWERCASE[Math.floor(Math.random() * LOWERCASE.length)]);
+    required.push(secureRandomChar(LOWERCASE));
   }
   if (options.includeUppercase) {
     charset += UPPERCASE;
-    required.push(UPPERCASE[Math.floor(Math.random() * UPPERCASE.length)]);
+    required.push(secureRandomChar(UPPERCASE));
   }
   if (options.includeNumbers) {
     charset += NUMBERS;
-    required.push(NUMBERS[Math.floor(Math.random() * NUMBERS.length)]);
+    required.push(secureRandomChar(NUMBERS));
   }
   if (options.includeSymbols) {
     charset += SYMBOLS;
-    required.push(SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)]);
+    required.push(secureRandomChar(SYMBOLS));
   }
 
   if (charset.length === 0) {
@@ -51,12 +78,13 @@ export function generatePassword(options: PasswordGeneratorOptions = DEFAULT_GEN
   const passwordChars: string[] = [...required];
 
   for (let i = passwordChars.length; i < length; i++) {
-    passwordChars.push(charset[Math.floor(Math.random() * charset.length)]);
+    passwordChars.push(secureRandomChar(charset));
   }
 
-  // Shuffle the array
+  // Cryptographically secure Fisher-Yates shuffle so required characters
+  // aren't predictably positioned at the front.
   for (let i = passwordChars.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = secureRandomInt(i + 1);
     [passwordChars[i], passwordChars[j]] = [passwordChars[j], passwordChars[i]];
   }
 

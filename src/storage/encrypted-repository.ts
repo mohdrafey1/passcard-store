@@ -1,5 +1,6 @@
 import { getDatabase } from './database';
-import { encrypt, decrypt, getEncryptionKey } from '@/security/encryption';
+import { encrypt, decrypt } from '@/security/encryption';
+import { getSessionKey } from '@/security/key-manager';
 import * as ExpoCrypto from 'expo-crypto';
 
 export interface BaseEntity {
@@ -24,11 +25,8 @@ export class EncryptedRepository<T extends BaseEntity> {
   ) {}
 
   private async getKey(): Promise<string> {
-    const key = await getEncryptionKey();
-    if (!key) {
-      throw new Error('Encryption key not found. Please set up PIN first.');
-    }
-    return key;
+    // The data key lives only in memory for the current unlocked session.
+    return getSessionKey();
   }
 
   /**
@@ -239,6 +237,45 @@ export class EncryptedRepository<T extends BaseEntity> {
         );
       }
     });
+  }
+
+  /**
+   * Delete all records using a caller-supplied db handle, WITHOUT opening its
+   * own transaction. Intended to be composed inside an external transaction
+   * (e.g. an atomic restore that spans multiple tables).
+   */
+  async deleteAllTx(db: Awaited<ReturnType<typeof getDatabase>>): Promise<void> {
+    await db.runAsync(`DELETE FROM ${this.tableName}`);
+  }
+
+  /**
+   * Insert records using a caller-supplied db handle, WITHOUT opening its own
+   * transaction. Used together with deleteAllTx for atomic restores.
+   */
+  async insertAllTx(
+    db: Awaited<ReturnType<typeof getDatabase>>,
+    items: T[],
+  ): Promise<void> {
+    const key = await this.getKey();
+    for (const item of items) {
+      const encryptedData = encrypt(JSON.stringify(item), key);
+      const searchFields = this.searchFieldExtractor(item);
+
+      const columns = ['id', 'encrypted_data', 'created_at', 'updated_at', ...Object.keys(searchFields)];
+      const placeholders = columns.map(() => '?').join(', ');
+      const values = [
+        item.id,
+        encryptedData,
+        item.createdAt,
+        item.updatedAt,
+        ...Object.values(searchFields),
+      ];
+
+      await db.runAsync(
+        `INSERT OR REPLACE INTO ${this.tableName} (${columns.join(', ')}) VALUES (${placeholders})`,
+        values,
+      );
+    }
   }
 
   /**

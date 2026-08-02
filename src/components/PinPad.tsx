@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Vibration } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import Animated, { useSharedValue, withSpring, useAnimatedStyle } from 'react-native-reanimated';
 import { Colors, FontSize, BorderRadius, Spacing } from '@/constants/theme';
@@ -54,11 +54,15 @@ function PinButton({
     onPress(value);
   }, [value, onPress, scale]);
 
+  const label = value === 'del' ? 'Delete' : value === 'bio' ? 'Unlock with biometrics' : value;
+
   return (
     <AnimatedTouchable
       style={[styles.button, extraStyle, animatedStyle]}
       onPress={handlePress}
       activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityLabel={label}
     >
       {children || <Text style={styles.buttonText}>{value}</Text>}
     </AnimatedTouchable>

@@ -3,10 +3,12 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as Updates from 'expo-updates';
 import { Ionicons } from '@expo/vector-icons';
 import { useSettingsStore } from '@/features/settings/store';
-import { initializeEncryptionKey } from '@/security/encryption';
+import { purgeExportCache } from '@/utils/cache';
 import { Colors, FontSize, Spacing } from '@/constants/theme';
 import { useAutoLock } from '@/hooks/useAutoLock';
 
@@ -103,38 +105,65 @@ const bannerStyles = StyleSheet.create({
 export default function RootLayout() {
   const isInitialized = useSettingsStore((s) => s.isInitialized);
   const initialize = useSettingsStore((s) => s.initialize);
+  const [bootError, setBootError] = useState(false);
 
   useAutoLock();
 
-  useEffect(() => {
-    async function boot() {
-      await initializeEncryptionKey();
+  const boot = useCallback(async () => {
+    setBootError(false);
+    try {
+      // Remove any stale plaintext export/share files left in cache.
+      purgeExportCache();
       await initialize();
+    } catch (e) {
+      setBootError(true);
     }
-    boot();
   }, [initialize]);
 
-  if (!isInitialized) {
-    return (
+  useEffect(() => {
+    boot();
+  }, [boot]);
+
+  let content: React.ReactNode;
+  if (bootError) {
+    content = (
+      <View style={styles.loading}>
+        <Ionicons name="warning-outline" size={48} color={Colors.danger} />
+        <Text style={styles.errorTitle}>Something went wrong</Text>
+        <Text style={styles.errorSubtitle}>The vault could not be initialized.</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={boot} activeOpacity={0.8}>
+          <Text style={styles.retryText}>Retry</Text>
+        </TouchableOpacity>
+        <StatusBar style="dark" />
+      </View>
+    );
+  } else if (!isInitialized) {
+    content = (
       <View style={styles.loading}>
         <ActivityIndicator size="large" color={Colors.primary} />
         <StatusBar style="dark" />
       </View>
     );
+  } else {
+    content = (
+      <>
+        <StatusBar style="dark" />
+        <UpdateBanner />
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: Colors.background },
+            animation: 'fade',
+          }}
+        />
+      </>
+    );
   }
 
   return (
-    <>
-      <StatusBar style="dark" />
-      <UpdateBanner />
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: Colors.background },
-          animation: 'fade',
-        }}
-      />
-    </>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>{content}</SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
 
@@ -144,5 +173,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: Colors.background,
+    paddingHorizontal: Spacing.xl,
+  },
+  errorTitle: {
+    fontSize: FontSize.lg,
+    fontWeight: '700',
+    color: Colors.text,
+    marginTop: Spacing.base,
+  },
+  errorSubtitle: {
+    fontSize: FontSize.sm,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    marginTop: Spacing.xs,
+  },
+  retryButton: {
+    marginTop: Spacing.lg,
+    backgroundColor: Colors.primary,
+    borderRadius: 12,
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.sm + 2,
+  },
+  retryText: {
+    fontSize: FontSize.base,
+    fontWeight: '700',
+    color: Colors.white,
   },
 });

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, type TextInputProps } from 'react-native';
 import { Colors, Spacing, FontSize, BorderRadius, FontFamily } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,6 +12,8 @@ interface SecureFieldProps extends Omit<TextInputProps, 'style'> {
   copyable?: boolean;
   onCopy?: () => void;
   editable?: boolean;
+  /** Increment to force the field to reveal its value (e.g. after generating). */
+  revealSignal?: number;
 }
 
 export default function SecureField({
@@ -23,9 +25,17 @@ export default function SecureField({
   copyable = false,
   onCopy,
   editable = true,
+  revealSignal,
   ...rest
 }: SecureFieldProps) {
   const [visible, setVisible] = useState(false);
+
+  // Reveal the value when the parent bumps revealSignal (skip the initial mount).
+  useEffect(() => {
+    if (revealSignal !== undefined && revealSignal > 0) {
+      setVisible(true);
+    }
+  }, [revealSignal]);
 
   return (
     <View style={styles.container}>
@@ -42,13 +52,20 @@ export default function SecureField({
         />
         <View style={styles.actions}>
           {copyable && value && (
-            <TouchableOpacity onPress={onCopy} style={styles.actionButton}>
+            <TouchableOpacity
+              onPress={onCopy}
+              style={styles.actionButton}
+              accessibilityRole="button"
+              accessibilityLabel={`Copy ${label}`}
+            >
               <Ionicons name="copy-outline" size={18} color={Colors.textSecondary} />
             </TouchableOpacity>
           )}
           <TouchableOpacity
             onPress={() => setVisible(!visible)}
             style={styles.actionButton}
+            accessibilityRole="button"
+            accessibilityLabel={visible ? `Hide ${label}` : `Show ${label}`}
           >
             <Ionicons
               name={visible ? 'eye-off-outline' : 'eye-outline'}

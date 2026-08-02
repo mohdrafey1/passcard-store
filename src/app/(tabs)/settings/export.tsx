@@ -11,25 +11,21 @@ import { cardRepository } from '@/storage/card-repository';
 export default function ExportScreen() {
   const [loading, setLoading] = useState(false);
 
-  const handleExport = async (type: 'passwords' | 'cards' | 'all') => {
+  const runExport = async (type: 'passwords' | 'cards') => {
     setLoading(true);
     try {
-      if (type === 'passwords' || type === 'all') {
+      if (type === 'passwords') {
         const passwords = await passwordRepository.findAll();
-        if (passwords.length === 0 && type === 'passwords') {
+        if (passwords.length === 0) {
           Alert.alert('No Data', 'No passwords to export');
-          setLoading(false);
           return;
         }
         const csv = exportPasswordsToCSV(passwords);
         await exportAndShareCSV(csv, 'passwords-export.csv');
-      }
-
-      if (type === 'cards' || type === 'all') {
+      } else {
         const cards = await cardRepository.findAll();
-        if (cards.length === 0 && type === 'cards') {
+        if (cards.length === 0) {
           Alert.alert('No Data', 'No cards to export');
-          setLoading(false);
           return;
         }
         const csv = exportCardsToCSV(cards);
@@ -40,6 +36,18 @@ export default function ExportScreen() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleExport = (type: 'passwords' | 'cards') => {
+    // CSV export is UNENCRYPTED plaintext — make sure the user understands.
+    Alert.alert(
+      'Export as plain text?',
+      `Your ${type} will be exported as an unencrypted CSV file readable by anyone who opens it. Only share it somewhere you trust.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Export', style: 'destructive', onPress: () => runExport(type) },
+      ],
+    );
   };
 
   return (

@@ -27,7 +27,7 @@ export const useCardStore = create<CardState>((set, get) => ({
       const cards = await cardRepository.findAll();
       set({ cards, loading: false });
     } catch (error) {
-      console.error('Failed to load cards:', error);
+      if (__DEV__) console.error('Failed to load cards:', error);
       set({ loading: false });
     }
   },
@@ -66,7 +66,7 @@ export const useCardStore = create<CardState>((set, get) => ({
       ]);
       set({ cards: results });
     } catch (error) {
-      console.error('Failed to search cards:', error);
+      if (__DEV__) console.error('Failed to search cards:', error);
     }
   },
 

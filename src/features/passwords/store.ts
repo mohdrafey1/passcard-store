@@ -31,7 +31,7 @@ export const usePasswordStore = create<PasswordState>((set, get) => ({
       const passwords = await passwordRepository.findAll();
       set({ passwords, loading: false });
     } catch (error) {
-      console.error('Failed to load passwords:', error);
+      if (__DEV__) console.error('Failed to load passwords:', error);
       set({ loading: false });
     }
   },
@@ -83,7 +83,7 @@ export const usePasswordStore = create<PasswordState>((set, get) => ({
       ]);
       set({ passwords: results });
     } catch (error) {
-      console.error('Failed to search passwords:', error);
+      if (__DEV__) console.error('Failed to search passwords:', error);
     }
   },
 

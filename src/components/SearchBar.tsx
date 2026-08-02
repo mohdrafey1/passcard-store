@@ -7,12 +7,15 @@ interface SearchBarProps {
   value: string;
   onChangeText: (text: string) => void;
   placeholder?: string;
+  /** Called when the keyboard search/submit key is pressed. */
+  onSubmit?: () => void;
 }
 
 export default function SearchBar({
   value,
   onChangeText,
   placeholder = 'Search...',
+  onSubmit,
 }: SearchBarProps) {
   return (
     <View style={styles.container}>
@@ -25,9 +28,17 @@ export default function SearchBar({
         placeholderTextColor={Colors.textMuted}
         autoCapitalize="none"
         autoCorrect={false}
+        returnKeyType={onSubmit ? 'search' : 'done'}
+        onSubmitEditing={onSubmit}
+        accessibilityLabel={placeholder}
       />
       {value.length > 0 && (
-        <TouchableOpacity onPress={() => onChangeText('')} style={styles.clearButton}>
+        <TouchableOpacity
+          onPress={() => onChangeText('')}
+          style={styles.clearButton}
+          accessibilityRole="button"
+          accessibilityLabel="Clear search"
+        >
           <Ionicons name="close-circle" size={18} color={Colors.textMuted} />
         </TouchableOpacity>
       )}

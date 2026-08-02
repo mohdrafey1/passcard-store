@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import PinPad from '@/components/PinPad';
 import { createPin } from '@/security/pin';
+import { provisionKeyForNewPin } from '@/security/key-manager';
 import { useSettingsStore } from '@/features/settings/store';
 import { Colors, FontSize, Spacing, BorderRadius } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,6 +15,7 @@ export default function CreatePinScreen() {
   const [firstPin, setFirstPin] = useState('');
   const [error, setError] = useState('');
   const initialize = useSettingsStore((s) => s.initialize);
+  const setAuthenticated = useSettingsStore((s) => s.setAuthenticated);
 
   const handleSelectLength = (length: 4 | 6) => {
     setPinLength(length);
@@ -36,8 +38,12 @@ export default function CreatePinScreen() {
 
     try {
       await createPin(pin);
+      // Provision the data key wrapped under this PIN and open the session, so
+      // the user goes straight into the app instead of re-entering the PIN.
+      await provisionKeyForNewPin(pin);
       await initialize();
-      router.replace('/(auth)/unlock');
+      setAuthenticated(true);
+      router.replace('/(tabs)');
     } catch (e) {
       setError('Failed to create PIN. Please try again.');
       setStep('create');

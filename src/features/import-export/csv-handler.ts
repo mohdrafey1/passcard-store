@@ -5,7 +5,11 @@ import type { PasswordEntry } from '@/types/password';
 import type { CardEntry } from '@/types/card';
 import { passwordRepository } from '@/storage/password-repository';
 import { cardRepository } from '@/storage/card-repository';
+import { cleanupTempFile } from '@/utils/cache';
+import { DEFAULT_CATEGORIES } from '@/constants/categories';
 import * as ExpoCrypto from 'expo-crypto';
+
+const VALID_CATEGORIES = new Set<string>(DEFAULT_CATEGORIES);
 
 export interface ImportResult {
   imported: number;
@@ -57,10 +61,17 @@ export async function exportAndShareCSV(csvContent: string, filename: string): P
 
   const isAvailable = await Sharing.isAvailableAsync();
   if (isAvailable) {
-    await Sharing.shareAsync(file.uri, {
-      mimeType: 'text/csv',
-      dialogTitle: `Export ${filename}`,
-    });
+    try {
+      await Sharing.shareAsync(file.uri, {
+        mimeType: 'text/csv',
+        dialogTitle: `Export ${filename}`,
+      });
+    } finally {
+      // Exported CSV is unencrypted plaintext — remove it from cache once shared.
+      cleanupTempFile(file.uri);
+    }
+  } else {
+    cleanupTempFile(file.uri);
   }
 }
 
@@ -122,6 +133,13 @@ export async function importPasswordsFromCSV(csvContent: string): Promise<Import
         continue;
       }
 
+      const rawCategory = (row.category || 'Other').trim();
+      // Guard against arbitrary category strings that would break the filter
+      // pills and category icons.
+      const category = (VALID_CATEGORIES.has(rawCategory)
+        ? rawCategory
+        : 'Other') as PasswordEntry['category'];
+
       const now = new Date().toISOString();
       toImport.push({
         id: ExpoCrypto.randomUUID(),
@@ -131,7 +149,7 @@ export async function importPasswordsFromCSV(csvContent: string): Promise<Import
         email,
         password,
         notes: (row.notes || '').trim(),
-        category: (row.category || 'Other').trim() as PasswordEntry['category'],
+        category,
         createdAt: now,
         updatedAt: now,
       });

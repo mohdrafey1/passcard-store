@@ -26,21 +26,30 @@ export async function getBiometricType(): Promise<string> {
   return 'Biometric';
 }
 
+export interface BiometricResult {
+  success: boolean;
+  /** Present on failure: e.g. 'user_cancel', 'authentication_failed', 'lockout'. */
+  error?: string;
+}
+
 /**
- * Authenticate user using biometrics
- * Returns true if authentication succeeded
+ * Authenticate user using biometrics.
+ * Returns success plus, on failure, the underlying reason so the caller can
+ * distinguish a genuine mismatch (which should count toward lockout) from a
+ * user cancel (which should not).
  */
 export async function authenticateWithBiometrics(
   promptMessage = 'Unlock Passcard Store',
-): Promise<boolean> {
+): Promise<BiometricResult> {
   try {
     const result = await LocalAuthentication.authenticateAsync({
       promptMessage,
       cancelLabel: 'Use PIN',
       disableDeviceFallback: true,
     });
-    return result.success;
+    if (result.success) return { success: true };
+    return { success: false, error: (result as { error?: string }).error };
   } catch {
-    return false;
+    return { success: false, error: 'unknown' };
   }
 }

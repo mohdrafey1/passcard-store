@@ -3,9 +3,14 @@ import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import PinPad from '@/components/PinPad';
-import { verifyStoredPin, getPinLength } from '@/security/pin';
+import { getPinLength } from '@/security/pin';
+import {
+  unlockWithPin,
+  unlockWithBiometricKey,
+  enableBiometricKey,
+} from '@/security/key-manager';
 import { authenticateWithBiometrics, isBiometricAvailable } from '@/security/biometrics';
-import { isLockedOut, recordFailedAttempt, resetLockout, getLockoutRemainingSeconds, getRemainingAttempts } from '@/security/lockout';
+import { isLockedOut, recordFailedAttempt, resetLockout, getLockoutRemainingSeconds, getRemainingAttempts, initLockout } from '@/security/lockout';
 import { useSettingsStore } from '@/features/settings/store';
 import { Colors, FontSize, Spacing } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,18 +26,24 @@ export default function UnlockScreen() {
 
   useEffect(() => {
     async function init() {
+      await initLockout();
+      if (isLockedOut()) {
+        setLockedOut(true);
+        setLockoutSeconds(getLockoutRemainingSeconds());
+      }
       const len = await getPinLength();
       setPinLength(len);
 
       if (biometricsEnabled) {
         const available = await isBiometricAvailable();
         setCanBiometric(available);
-        if (available) {
+        if (available && !isLockedOut()) {
           handleBiometric();
         }
       }
     }
     init();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [biometricsEnabled]);
 
   // Lockout timer
@@ -51,14 +62,34 @@ export default function UnlockScreen() {
     return () => clearInterval(interval);
   }, [lockedOut]);
 
+  const registerLockout = useCallback(() => {
+    setLockedOut(true);
+    setLockoutSeconds(getLockoutRemainingSeconds());
+    setError('Too many failed attempts. Try again in 1 minute.');
+  }, []);
+
   const handleBiometric = useCallback(async () => {
-    const success = await authenticateWithBiometrics();
-    if (success) {
-      resetLockout();
-      setAuthenticated(true);
-      router.replace('/(tabs)');
+    if (isLockedOut()) {
+      setLockedOut(true);
+      setLockoutSeconds(getLockoutRemainingSeconds());
+      return;
     }
-  }, [setAuthenticated]);
+    const result = await authenticateWithBiometrics();
+    if (result.success) {
+      const opened = await unlockWithBiometricKey();
+      if (opened) {
+        resetLockout();
+        setAuthenticated(true);
+        router.replace('/(tabs)');
+        return;
+      }
+      // Biometrics passed but no key is provisioned for it — fall back to PIN.
+      setError('Please unlock with your PIN.');
+    } else if (result.error === 'authentication_failed' || result.error === 'lockout') {
+      // A genuine biometric mismatch counts toward the lockout too.
+      if (recordFailedAttempt()) registerLockout();
+    }
+  }, [setAuthenticated, registerLockout]);
 
   const handlePinComplete = useCallback(async (pin: string) => {
     if (isLockedOut()) {
@@ -67,23 +98,26 @@ export default function UnlockScreen() {
       return;
     }
 
-    const valid = await verifyStoredPin(pin);
+    const valid = await unlockWithPin(pin);
     if (valid) {
       resetLockout();
+      // Re-provision the biometric key slot for users who had biometrics on
+      // before this build (migration) so future biometric unlocks work.
+      if (biometricsEnabled) {
+        await enableBiometricKey().catch(() => {});
+      }
       setAuthenticated(true);
       router.replace('/(tabs)');
     } else {
       const locked = recordFailedAttempt();
       if (locked) {
-        setLockedOut(true);
-        setLockoutSeconds(getLockoutRemainingSeconds());
-        setError('Too many failed attempts. Try again in 1 minute.');
+        registerLockout();
       } else {
         const remaining = getRemainingAttempts();
         setError(`Wrong PIN. ${remaining} attempt${remaining !== 1 ? 's' : ''} remaining.`);
       }
     }
-  }, [setAuthenticated]);
+  }, [setAuthenticated, biometricsEnabled, registerLockout]);
 
   return (
     <SafeAreaView style={styles.container}>

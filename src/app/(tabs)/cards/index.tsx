@@ -1,22 +1,37 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, FontSize, Spacing, BorderRadius, Shadow } from '@/constants/theme';
+import { Colors, FontSize, Spacing, BorderRadius, Shadow, CardGradient } from '@/constants/theme';
 import SearchBar from '@/components/SearchBar';
 import EmptyState from '@/components/EmptyState';
 import ActionSheet, { type SheetAction } from '@/components/ActionSheet';
 import { useCardStore } from '@/features/cards/store';
 import { useSettingsStore } from '@/features/settings/store';
 import { copyToClipboard } from '@/utils/clipboard';
+import { showToast } from '@/utils/toast';
 import { shareCard } from '@/utils/share';
 import { useDebounce } from '@/hooks/useDebounce';
 import type { CardEntry } from '@/types/card';
 import { LinearGradient } from 'expo-linear-gradient';
 
+const REVEAL_TIMEOUT_MS = 20 * 1000;
+
 function CreditCardWidget({ card, onPress, onLongPress }: { card: CardEntry; onPress: () => void; onLongPress: () => void }) {
   const [revealed, setRevealed] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Auto-hide sensitive details after a short window to limit shoulder-surfing.
+  useEffect(() => {
+    if (revealed) {
+      timerRef.current = setTimeout(() => setRevealed(false), REVEAL_TIMEOUT_MS);
+    }
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [revealed]);
+
   const maskedNumber = `•••• •••• •••• ${card.cardNumber.slice(-4)}`;
   const displayNumber = revealed
     ? card.cardNumber.replace(/(.{4})/g, '$1 ').trim()
@@ -25,14 +40,19 @@ function CreditCardWidget({ card, onPress, onLongPress }: { card: CardEntry; onP
   return (
     <TouchableOpacity onPress={onPress} onLongPress={onLongPress} activeOpacity={0.8}>
       <LinearGradient
-        colors={['#3D2E22', '#1F1712', '#130E0A']}
+        colors={CardGradient}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={[styles.creditCard, Shadow.md]}
       >
         <View style={styles.cardHeader}>
           <Text style={styles.cardNickname}>{card.cardNickname || 'Card'}</Text>
-          <TouchableOpacity onPress={() => setRevealed(!revealed)}>
+          <TouchableOpacity
+            onPress={() => setRevealed(!revealed)}
+            accessibilityRole="button"
+            accessibilityLabel={revealed ? 'Hide card details' : 'Reveal card details'}
+            hitSlop={8}
+          >
             <Ionicons name={revealed ? 'eye-off' : 'eye'} size={20} color={Colors.primaryLight} />
           </TouchableOpacity>
         </View>
@@ -79,7 +99,9 @@ export default function CardListScreen() {
     }, [debouncedSearch]),
   );
 
-  const filtered = useCardStore((s) => s.getFiltered)();
+  // The store already narrows `cards` to search results when searching, so the
+  // list can render it directly (no fragile "call the selector" pattern).
+  const filtered = cards;
 
   const confirmDelete = useCallback((item: CardEntry) => {
     Alert.alert('Delete Card', `Delete "${item.cardNickname || 'this card'}"? This cannot be undone.`, [
@@ -90,9 +112,9 @@ export default function CardListScreen() {
 
   const actionItemActions: SheetAction[] = actionItem
     ? [
-        { label: 'Copy Card Number', icon: 'card-outline', onPress: () => copyToClipboard(actionItem.cardNumber, clipboardDuration) },
-        { label: 'Copy CVV', icon: 'lock-closed-outline', onPress: () => copyToClipboard(actionItem.cvv, clipboardDuration) },
-        { label: 'Copy Expiry', icon: 'calendar-outline', onPress: () => copyToClipboard(`${actionItem.expiryMonth}/${actionItem.expiryYear}`, clipboardDuration) },
+        { label: 'Copy Card Number', icon: 'card-outline', onPress: () => { copyToClipboard(actionItem.cardNumber, clipboardDuration); showToast('Card number copied'); } },
+        { label: 'Copy CVV', icon: 'lock-closed-outline', onPress: () => { copyToClipboard(actionItem.cvv, clipboardDuration); showToast('CVV copied'); } },
+        { label: 'Copy Expiry', icon: 'calendar-outline', onPress: () => { copyToClipboard(`${actionItem.expiryMonth}/${actionItem.expiryYear}`, clipboardDuration); showToast('Expiry copied'); } },
         { label: 'Share', icon: 'share-outline', onPress: () => shareCard(actionItem) },
         { label: 'Delete', icon: 'trash-outline', destructive: true, onPress: () => confirmDelete(actionItem) },
       ]
@@ -102,7 +124,7 @@ export default function CardListScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.title}>Cards</Text>
-        <TouchableOpacity style={styles.addButton} onPress={() => router.push('/(tabs)/cards/add')}>
+        <TouchableOpacity style={styles.addButton} onPress={() => router.push('/(tabs)/cards/add')} accessibilityRole="button" accessibilityLabel="Add card">
           <Ionicons name="add" size={24} color={Colors.white} />
         </TouchableOpacity>
       </View>
@@ -125,7 +147,17 @@ export default function CardListScreen() {
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
-          <EmptyState icon="card-outline" title="No cards yet" subtitle="Tap + to add your first card" />
+          loading ? (
+            <View style={styles.loadingBox}>
+              <ActivityIndicator size="large" color={Colors.primary} />
+            </View>
+          ) : (
+            <EmptyState
+              icon="card-outline"
+              title={debouncedSearch ? 'No matches found' : 'No cards yet'}
+              subtitle={debouncedSearch ? 'Try a different search' : 'Tap + to add your first card'}
+            />
+          )
         }
       />
 
@@ -148,6 +180,7 @@ const styles = StyleSheet.create({
   searchContainer: { paddingHorizontal: Spacing.base, marginBottom: Spacing.sm },
   list: { flex: 1 },
   listContent: { flexGrow: 1, paddingHorizontal: Spacing.base, paddingBottom: Spacing['3xl'] },
+  loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: Spacing['4xl'] },
   creditCard: { borderRadius: BorderRadius.xl, padding: Spacing.lg, marginBottom: Spacing.base, minHeight: 200, justifyContent: 'space-between' },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   cardNickname: { fontSize: FontSize.base, fontWeight: '600', color: Colors.primaryLight },

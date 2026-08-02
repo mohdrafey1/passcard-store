@@ -4,13 +4,20 @@ import * as ExpoCrypto from 'expo-crypto';
 import CryptoJS from 'crypto-js';
 import { passwordRepository } from '@/storage/password-repository';
 import { cardRepository } from '@/storage/card-repository';
-import { loadSettings } from '@/storage/settings-storage';
+import { getDatabase } from '@/storage/database';
+import { loadSettings, saveSetting } from '@/storage/settings-storage';
 import type { PasswordEntry } from '@/types/password';
 import type { CardEntry } from '@/types/card';
 import type { AppSettings } from '@/types/settings';
 
 const BACKUP_VERSION = 1;
 const BACKUP_MAGIC = 'PASSCARD_VAULT';
+// A high iteration count is affordable here because backups are infrequent.
+const BACKUP_ITERATIONS = 210_000;
+// Old builds used a single hard-coded salt and 5k iterations. Kept only so
+// existing backups can still be restored.
+const LEGACY_ITERATIONS = 5_000;
+const LEGACY_SALT = 'passcard-backup-salt-v1';
 
 interface BackupPayload {
   magic: string;
@@ -21,20 +28,36 @@ interface BackupPayload {
   settings: AppSettings;
 }
 
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
 /**
- * Derive an encryption key from PIN for backup encryption
- * (separate from the vault encryption key)
+ * Derive a backup encryption key from the PIN using a per-backup random salt.
+ * A random salt makes each backup's key unique, defeating precomputation and
+ * cross-file/cross-user attacks that a shared static salt would allow.
  */
-function deriveBackupKey(pin: string): string {
-  const salt = CryptoJS.enc.Utf8.parse('passcard-backup-salt-v1');
+function deriveBackupKey(pin: string, saltHex: string): string {
+  const salt = CryptoJS.enc.Hex.parse(saltHex);
   return CryptoJS.PBKDF2(pin, salt, {
     keySize: 256 / 32,
-    iterations: 5000,
+    iterations: BACKUP_ITERATIONS,
+  }).toString(CryptoJS.enc.Hex);
+}
+
+function deriveLegacyBackupKey(pin: string): string {
+  const salt = CryptoJS.enc.Utf8.parse(LEGACY_SALT);
+  return CryptoJS.PBKDF2(pin, salt, {
+    keySize: 256 / 32,
+    iterations: LEGACY_ITERATIONS,
   }).toString(CryptoJS.enc.Hex);
 }
 
 /**
- * Create an encrypted .vaultx backup file
+ * Create an encrypted .vaultx backup file.
+ * File format: `<saltHex>:<ivHex>:<ciphertext>`
  */
 export async function createBackup(pin: string): Promise<string> {
   const passwords = await passwordRepository.findAll();
@@ -51,12 +74,10 @@ export async function createBackup(pin: string): Promise<string> {
   };
 
   const jsonString = JSON.stringify(payload);
-  const backupKey = deriveBackupKey(pin);
+  const saltHex = bytesToHex(ExpoCrypto.getRandomBytes(16));
+  const backupKey = deriveBackupKey(pin, saltHex);
   const keyWordArray = CryptoJS.enc.Hex.parse(backupKey);
-  // Use expo-crypto's native secure RNG for the IV (see security/encryption.ts).
-  const ivHex = Array.from(ExpoCrypto.getRandomBytes(16))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
+  const ivHex = bytesToHex(ExpoCrypto.getRandomBytes(16));
   const iv = CryptoJS.enc.Hex.parse(ivHex);
 
   const encrypted = CryptoJS.AES.encrypt(jsonString, keyWordArray, {
@@ -65,7 +86,7 @@ export async function createBackup(pin: string): Promise<string> {
     padding: CryptoJS.pad.Pkcs7,
   });
 
-  const backupContent = iv.toString(CryptoJS.enc.Hex) + ':' + encrypted.toString();
+  const backupContent = `${saltHex}:${ivHex}:${encrypted.toString()}`;
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const filename = `passcard-backup-${timestamp}.vaultx`;
@@ -91,27 +112,36 @@ export async function shareBackup(fileUri: string): Promise<void> {
 }
 
 /**
- * Restore from an encrypted .vaultx backup file
+ * Decrypt a .vaultx file's contents into a validated payload.
+ * Supports both the new salted format and the legacy static-salt format.
  */
-export async function restoreBackup(
-  fileUri: string,
-  pin: string,
-): Promise<{ passwords: number; cards: number }> {
-  const file = new File(fileUri);
-  const content = await file.text();
-
+function decryptBackup(content: string, pin: string): BackupPayload {
   const parts = content.split(':');
-  if (parts.length !== 2) {
+
+  let saltDerivedKey: string;
+  let ivHex: string;
+  let ciphertext: string;
+
+  if (parts.length === 3) {
+    // New format: salt:iv:ciphertext
+    saltDerivedKey = deriveBackupKey(pin, parts[0]);
+    ivHex = parts[1];
+    ciphertext = parts[2];
+  } else if (parts.length === 2) {
+    // Legacy format: iv:ciphertext (static salt)
+    saltDerivedKey = deriveLegacyBackupKey(pin);
+    ivHex = parts[0];
+    ciphertext = parts[1];
+  } else {
     throw new Error('Invalid backup file format');
   }
 
-  const backupKey = deriveBackupKey(pin);
-  const iv = CryptoJS.enc.Hex.parse(parts[0]);
-  const keyWordArray = CryptoJS.enc.Hex.parse(backupKey);
+  const iv = CryptoJS.enc.Hex.parse(ivHex);
+  const keyWordArray = CryptoJS.enc.Hex.parse(saltDerivedKey);
 
   let decryptedString: string;
   try {
-    const decrypted = CryptoJS.AES.decrypt(parts[1], keyWordArray, {
+    const decrypted = CryptoJS.AES.decrypt(ciphertext, keyWordArray, {
       iv,
       mode: CryptoJS.mode.CBC,
       padding: CryptoJS.pad.Pkcs7,
@@ -135,17 +165,46 @@ export async function restoreBackup(
   if (payload.magic !== BACKUP_MAGIC) {
     throw new Error('Not a valid Passcard Store backup file');
   }
-
-  // Clear existing data and import
-  await passwordRepository.deleteAll();
-  await cardRepository.deleteAll();
-
-  if (payload.passwords.length > 0) {
-    await passwordRepository.bulkCreate(payload.passwords);
+  if (!Array.isArray(payload.passwords) || !Array.isArray(payload.cards)) {
+    throw new Error('Backup is missing expected data');
   }
 
-  if (payload.cards.length > 0) {
-    await cardRepository.bulkCreate(payload.cards);
+  return payload;
+}
+
+/**
+ * Restore from an encrypted .vaultx backup file.
+ * The whole operation is validated up front and applied inside a single
+ * transaction spanning both tables, so a failure can never leave the vault
+ * half-wiped.
+ */
+export async function restoreBackup(
+  fileUri: string,
+  pin: string,
+): Promise<{ passwords: number; cards: number }> {
+  const file = new File(fileUri);
+  const content = await file.text();
+
+  // Validate + decrypt BEFORE touching existing data.
+  const payload = decryptBackup(content, pin);
+
+  const db = await getDatabase();
+  await db.withTransactionAsync(async () => {
+    await passwordRepository.deleteAllTx(db);
+    await cardRepository.deleteAllTx(db);
+    await passwordRepository.insertAllTx(db, payload.passwords);
+    await cardRepository.insertAllTx(db, payload.cards);
+  });
+
+  // Restore device-agnostic preferences (not biometrics/PIN, which are
+  // specific to this device and secret).
+  if (payload.settings) {
+    if (payload.settings.autoLockDuration !== undefined) {
+      await saveSetting('autoLockDuration', payload.settings.autoLockDuration).catch(() => {});
+    }
+    if (payload.settings.clipboardClearDuration !== undefined) {
+      await saveSetting('clipboardClearDuration', payload.settings.clipboardClearDuration).catch(() => {});
+    }
   }
 
   return {

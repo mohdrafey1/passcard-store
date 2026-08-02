@@ -13,12 +13,16 @@ A production-grade, fully offline secure vault for passwords and cards — built
 
 ### 🛡️ Security
 - **Master PIN** — 4 or 6 digit PIN with PBKDF2 hashing (10,000 iterations)
-- **AES-256-CBC Encryption** — Every sensitive record encrypted at rest
+- **PIN-Wrapped Data Key** — The AES data key is encrypted with a key derived from your PIN and only held in memory while unlocked, so the database can't be decrypted without the PIN
+- **AES-256-CBC Encryption** — Every sensitive record encrypted at rest with a per-record random IV
+- **CSPRNG Password Generator** — Generated passwords use the device's cryptographically secure RNG (never `Math.random()`)
 - **Biometric Unlock** — Fingerprint / Face authentication support
-- **Lockout Protection** — 5 failed attempts → 60 second lockout
+- **Lockout Protection** — 5 failed attempts → 60 second lockout, **persisted across app restarts** and applied to biometric failures too
 - **Auto-Lock** — Configurable lock on app background (immediate / 30s / 1m / 5m / 15m)
 - **Clipboard Auto-Clear** — Automatically clears copied data after 15s / 30s / 60s
-- **Zero Plain-Text Storage** — PIN hash and salt stored securely, never the raw PIN
+- **Encrypted Backups** — `.vaultx` files use AES-256 with a **per-backup random salt** and 210k PBKDF2 iterations
+- **Re-authentication** — Deleting all data and creating a backup require re-entering your PIN
+- **Secure metadata note** — Search index columns (titles, websites, emails, cardholder names, last 4 digits) are stored unencrypted for fast search; everything sensitive (passwords, full card numbers, CVVs) is always encrypted
 
 ### 🔑 Password Management
 - Create, edit, duplicate, and delete password entries
