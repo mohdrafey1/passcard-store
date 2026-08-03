@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Privacy Policy — Passcard Store</title>
+    <meta
+      name="description"
+      content="Privacy Policy for Passcard Store. The app is fully offline and does not collect, transmit, or share any personal data."
+    />
+    <meta name="theme-color" content="#d89a1c" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="container">
+        <a class="brand" href="index.html">
+          <svg class="logo" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+            <path d="M24 3l16 6v11c0 10.5-6.8 18.7-16 22-9.2-3.3-16-11.5-16-22V9l16-6z" fill="#d89a1c"/>
+            <path d="M16.5 24.5l5 5 10-10.5" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>Passcard Store</span>
+        </a>
+        <nav class="nav">
+          <a href="privacy-policy.html">Privacy</a>
+          <a href="terms.html">Terms</a>
+          <a href="contact.html">Contact</a>
+        </nav>
+      </div>
+    </header>
+
+    <div class="page-head">
+      <div class="container">
+        <h1>Privacy Policy</h1>
+        <p class="updated">Last updated: 3 August 2026</p>
+      </div>
+    </div>
+
+    <main class="container">
+      <article class="article">
+        <div class="callout success">
+          <p>
+            <strong>The short version:</strong> Passcard Store is a 100% offline app. We do
+            <strong>not</strong> collect, store, transmit, sell, or share any of your personal
+            information. Your passwords and cards never leave your device.
+          </p>
+        </div>
+
+        <div class="toc">
+          <strong>Contents</strong>
+          <ol>
+            <li><a href="#who">Who we are</a></li>
+            <li><a href="#collect">Information we collect</a></li>
+            <li><a href="#storage">How your data is stored</a></li>
+            <li><a href="#permissions">Permissions we use</a></li>
+            <li><a href="#network">Network &amp; third parties</a></li>
+            <li><a href="#sharing">Data sharing</a></li>
+            <li><a href="#children">Children's privacy</a></li>
+            <li><a href="#rights">Your rights &amp; deletion</a></li>
+            <li><a href="#changes">Changes</a></li>
+            <li><a href="#contact">Contact</a></li>
+          </ol>
+        </div>
+
+        <h2 id="who">1. Who we are</h2>
+        <p>
+          Passcard Store ("the app", "we", "us") is a free, open-source password and card
+          manager for Android, developed by <strong>mohdrafey1</strong>. This Privacy Policy
+          explains how the app handles information. By using the app you agree to this policy.
+        </p>
+
+        <h2 id="collect">2. Information we collect</h2>
+        <p>
+          <strong>We do not collect any personal data.</strong> The app has no user accounts,
+          no registration, and no analytics. We never see, receive, or have access to anything
+          you store in the app.
+        </p>
+        <p>The information <em>you</em> enter and that stays only on your device includes:</p>
+        <ul>
+          <li>Password entries (titles, websites, usernames, emails, passwords, notes, categories)</li>
+          <li>Card entries (cardholder name, card number, expiry, CVV, nickname, notes)</li>
+          <li>App settings (PIN length, biometric preference, auto-lock and clipboard timers)</li>
+        </ul>
+        <p>
+          All of this is stored <strong>locally on your device only</strong>. It is never
+          uploaded to us or to any third party.
+        </p>
+
+        <h2 id="storage">3. How your data is stored and secured</h2>
+        <ul>
+          <li>
+            Sensitive data (passwords, full card numbers, CVVs) is encrypted with
+            <strong>AES-256</strong> and stored in a local database on your device.
+          </li>
+          <li>
+            The encryption key is protected by a key derived from your PIN and is only held in
+            memory while the app is unlocked.
+          </li>
+          <li>
+            Your PIN is never stored in plain text — only a salted PBKDF2 hash is kept, in the
+            device's secure storage (Android Keystore).
+          </li>
+          <li>
+            Backups you create (<code>.vaultx</code> files) are encrypted with AES-256 using
+            your PIN. CSV exports are <strong>not</strong> encrypted — you control where those
+            files go.
+          </li>
+        </ul>
+        <div class="callout">
+          <p>
+            Because everything is stored only on your device with no cloud copy, we cannot
+            recover your data or PIN if you lose your device or forget your PIN. Please keep a
+            backup.
+          </p>
+        </div>
+
+        <h2 id="permissions">4. Permissions we use</h2>
+        <table class="data-table">
+          <thead>
+            <tr><th>Permission</th><th>Why it is used</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Biometric / Fingerprint</td><td>To let you unlock the vault with your fingerprint or face, if you enable it. Biometric data is handled entirely by your device's operating system and is never accessed by the app.</td></tr>
+            <tr><td>Files (document picker)</td><td>Only when you choose to import a CSV or restore a backup file that you select.</td></tr>
+            <tr><td>Sharing</td><td>Only when you tap "share" or "export" to send a file through your device's share sheet.</td></tr>
+          </tbody>
+        </table>
+
+        <h2 id="network">5. Network &amp; third-party services</h2>
+        <p>
+          The app is designed to work offline and does not send your vault data over the
+          network. The only network activity is:
+        </p>
+        <ul>
+          <li>
+            <strong>App updates.</strong> The app may check for over-the-air updates through
+            Expo's update service (EAS Update) so you receive improvements and fixes. This
+            checks for a new app version only; it does not transmit any of your personal or
+            vault data.
+          </li>
+          <li>
+            <strong>Distribution.</strong> The app is distributed through the Google Play
+            Store, which is governed by
+            <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google's Privacy Policy</a>.
+          </li>
+        </ul>
+        <p>The app contains <strong>no advertising, no third-party trackers, and no analytics SDKs.</strong></p>
+
+        <h2 id="sharing">6. Data sharing</h2>
+        <p>
+          We do not share, sell, rent, or disclose your information to anyone, because we never
+          have it in the first place. Any sharing of your data happens only when you explicitly
+          use the export or share features to send a file yourself.
+        </p>
+
+        <h2 id="children">7. Children's privacy</h2>
+        <p>
+          The app does not knowingly collect any information from anyone, including children
+          under the age of 13. Since no data is collected or transmitted, there is no
+          children's data to process.
+        </p>
+
+        <h2 id="rights">8. Your rights and data deletion</h2>
+        <p>
+          You are always in full control of your data. You can view, edit, or delete any entry
+          at any time inside the app. To remove everything:
+        </p>
+        <ul>
+          <li>Open <strong>Settings → Delete All Data</strong> to permanently erase the vault, or</li>
+          <li>Uninstall the app, which removes all locally stored data.</li>
+        </ul>
+        <p>See the <a href="contact.html">Contact &amp; Data Deletion</a> page for full details.</p>
+
+        <h2 id="changes">9. Changes to this policy</h2>
+        <p>
+          We may update this Privacy Policy from time to time. Changes will be posted on this
+          page with a new "Last updated" date. Continued use of the app after changes means you
+          accept the revised policy.
+        </p>
+
+        <h2 id="contact">10. Contact us</h2>
+        <p>If you have any questions about this Privacy Policy, contact us at:</p>
+        <p class="contact-line">✉️ <a href="mailto:mohdrafey600@gmail.com">mohdrafey600@gmail.com</a></p>
+      </article>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container">
+        <div class="footer-grid">
+          <a class="brand" href="index.html">
+            <svg class="logo" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+              <path d="M24 3l16 6v11c0 10.5-6.8 18.7-16 22-9.2-3.3-16-11.5-16-22V9l16-6z" fill="#d89a1c"/>
+              <path d="M16.5 24.5l5 5 10-10.5" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span>Passcard Store</span>
+          </a>
+          <nav class="footer-links">
+            <a href="index.html">Home</a>
+            <a href="privacy-policy.html">Privacy Policy</a>
+            <a href="terms.html">Terms &amp; Conditions</a>
+            <a href="contact.html">Contact / Delete Account</a>
+          </nav>
+        </div>
+        <p class="footer-note">© 2026 Passcard Store · Developed by mohdrafey1 · All data stays on your device.</p>
+      </div>
+    </footer>
+  </body>
+</html>
