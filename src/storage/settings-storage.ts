@@ -21,7 +21,9 @@ export async function loadSettings(): Promise<AppSettings> {
   ]);
 
   return {
-    biometricsEnabled: biometrics === 'true',
+    // Default ON: biometric unlock is enabled unless the user explicitly
+    // turned it off (a missing value means a fresh install).
+    biometricsEnabled: biometrics !== 'false',
     autoLockDuration: autoLock
       ? (parseInt(autoLock, 10) as AutoLockDuration)
       : DEFAULT_SETTINGS.autoLockDuration,

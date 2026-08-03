@@ -4,7 +4,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import PinPad from '@/components/PinPad';
 import { createPin } from '@/security/pin';
-import { provisionKeyForNewPin } from '@/security/key-manager';
+import { provisionKeyForNewPin, enableBiometricKey } from '@/security/key-manager';
+import { isBiometricAvailable } from '@/security/biometrics';
+import { saveSetting } from '@/storage/settings-storage';
 import { useSettingsStore } from '@/features/settings/store';
 import { Colors, FontSize, Spacing, BorderRadius } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
@@ -43,6 +45,18 @@ export default function CreatePinScreen() {
       // Provision the data key wrapped under this PIN and open the session, so
       // the user goes straight into the app instead of re-entering the PIN.
       await provisionKeyForNewPin(pin);
+      // Biometric unlock is ON by default. If the device has fingerprint/face
+      // set up, provision the biometric key slot now so it works from the very
+      // first lock. If not available, the setting stays on but simply falls
+      // back to the PIN until the user enrolls a biometric.
+      try {
+        if (await isBiometricAvailable()) {
+          await enableBiometricKey();
+          await saveSetting('biometricsEnabled', true);
+        }
+      } catch {
+        // Non-fatal — the user can still unlock with their PIN.
+      }
       await initialize();
       setAuthenticated(true);
       router.replace('/(tabs)');
@@ -126,7 +140,11 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   creatingOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(246, 242, 235, 0.7)',

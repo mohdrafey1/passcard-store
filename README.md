@@ -16,7 +16,7 @@ A production-grade, fully offline secure vault for passwords and cards — built
 - **PIN-Wrapped Data Key** — The AES data key is encrypted with a key derived from your PIN and only held in memory while unlocked, so the database can't be decrypted without the PIN
 - **AES-256-CBC Encryption** — Every sensitive record encrypted at rest with a per-record random IV
 - **CSPRNG Password Generator** — Generated passwords use the device's cryptographically secure RNG (never `Math.random()`)
-- **Biometric Unlock** — Fingerprint / Face authentication support
+- **Biometric Unlock** — Fingerprint / Face authentication (on by default; falls back to PIN)
 - **Screenshot & Recents Protection** — Android `FLAG_SECURE` blocks screenshots/screen recording and hides vault contents in the app switcher
 - **Lockout Protection** — 5 failed attempts → 60 second lockout, **persisted across app restarts** and applied to biometric failures too
 - **Auto-Lock** — Configurable lock on app background (immediate / 30s / 1m / 5m / 15m)
