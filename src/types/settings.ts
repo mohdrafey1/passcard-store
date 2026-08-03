@@ -10,7 +10,7 @@ export interface AppSettings {
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
-  biometricsEnabled: false,
+  biometricsEnabled: true,
   autoLockDuration: 0,
   clipboardClearDuration: 30,
   pinLength: 4,
