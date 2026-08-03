@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -9,15 +9,45 @@ import { Colors, FontSize, Spacing, BorderRadius } from '@/constants/theme';
 import { importPasswordsFromCSV, importCardsFromCSV, type ImportResult } from '@/features/import-export/csv-handler';
 import { usePasswordStore } from '@/features/passwords/store';
 import { useCardStore } from '@/features/cards/store';
+import { verifyStoredPin, getPinLength } from '@/security/pin';
+import PinModal from '@/components/PinModal';
 
 export default function ImportScreen() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [importType, setImportType] = useState<'passwords' | 'cards' | null>(null);
+  const [pinLength, setPinLength] = useState<4 | 6>(4);
+  const [pinVisible, setPinVisible] = useState(false);
+  const [pinError, setPinError] = useState('');
+  const [pendingType, setPendingType] = useState<'passwords' | 'cards' | null>(null);
   const loadPasswords = usePasswordStore((s) => s.load);
   const loadCards = useCardStore((s) => s.load);
 
-  const handleImport = async (type: 'passwords' | 'cards') => {
+  useEffect(() => {
+    getPinLength().then(setPinLength);
+  }, []);
+
+  // Importing requires the PIN, so an unattended unlocked phone can't be used
+  // to inject entries into the vault from a file.
+  const handleImport = (type: 'passwords' | 'cards') => {
+    setPendingType(type);
+    setPinError('');
+    setPinVisible(true);
+  };
+
+  const handlePinComplete = async (pin: string) => {
+    const ok = await verifyStoredPin(pin);
+    if (!ok) {
+      setPinError('Incorrect PIN.');
+      return;
+    }
+    setPinVisible(false);
+    const type = pendingType;
+    setPendingType(null);
+    if (type) runImport(type);
+  };
+
+  const runImport = async (type: 'passwords' | 'cards') => {
     try {
       const doc = await DocumentPicker.getDocumentAsync({ type: ['text/csv', 'text/comma-separated-values', '*/*'] });
       if (doc.canceled) return;
@@ -100,6 +130,16 @@ export default function ImportScreen() {
           </>
         )}
       </View>
+
+      <PinModal
+        visible={pinVisible}
+        pinLength={pinLength}
+        title="Confirm Your PIN"
+        subtitle="Enter your PIN to import data"
+        error={pinError}
+        onComplete={handlePinComplete}
+        onClose={() => { setPinVisible(false); setPendingType(null); }}
+      />
     </SafeAreaView>
   );
 }

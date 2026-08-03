@@ -79,13 +79,15 @@ export default function BackupScreen() {
       const name = (asset.name || '').toLowerCase();
 
       // Do NOT hard-block on the extension: some providers return a display
-      // name without ".vaultx". Validation happens for real when we try to
-      // decrypt the file (it carries a magic header). If the name clearly
-      // isn't a backup, just confirm before continuing.
-      if (name && !name.endsWith('.vaultx')) {
+      // name without an extension. Validation happens for real when we try to
+      // decrypt the file (it carries a magic header). Backups are saved as
+      // .txt now (older ones were .vaultx); anything else just gets a soft
+      // confirmation.
+      const looksLikeBackup = name.endsWith('.txt') || name.endsWith('.vaultx');
+      if (name && !looksLikeBackup) {
         Alert.alert(
           'Use this file?',
-          "This doesn't look like a .vaultx backup, but some file managers hide the extension. If this is your Passcard backup, continue.",
+          "This doesn't look like a Passcard backup, but some file managers hide the extension. If this is your backup file, continue.",
           [
             { text: 'Cancel', style: 'cancel' },
             { text: 'Continue', onPress: () => proceedWithRestore(uri) },
@@ -180,7 +182,7 @@ export default function BackupScreen() {
               </View>
               <View style={styles.actionText}>
                 <Text style={styles.actionTitle}>Create Backup</Text>
-                <Text style={styles.actionHint}>Encrypted .vaultx file with all your data</Text>
+                <Text style={styles.actionHint}>Encrypted backup file with all your data</Text>
               </View>
             </TouchableOpacity>
             <TouchableOpacity style={styles.actionButton} onPress={handlePickRestore} accessibilityRole="button" accessibilityLabel="Restore backup">
@@ -189,7 +191,7 @@ export default function BackupScreen() {
               </View>
               <View style={styles.actionText}>
                 <Text style={styles.actionTitle}>Restore Backup</Text>
-                <Text style={styles.actionHint}>Import from a .vaultx backup file (replaces current data)</Text>
+                <Text style={styles.actionHint}>Import from a backup file (replaces current data)</Text>
               </View>
             </TouchableOpacity>
           </>

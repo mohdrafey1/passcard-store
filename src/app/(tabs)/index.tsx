@@ -186,7 +186,7 @@ export default function DashboardScreen() {
             to any cloud or server.
           </Text>
           <Text style={styles.noticeText}>
-            Before switching or resetting your phone, export a backup (CSV or .vaultx) from
+            Before switching or resetting your phone, export a backup (CSV or encrypted backup) from
             Settings — otherwise your data cannot be recovered.
           </Text>
           <TouchableOpacity
