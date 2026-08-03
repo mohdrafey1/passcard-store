@@ -1,68 +1,68 @@
 {
-    "expo": {
-        "name": "Passcard Store",
-        "slug": "passcard-store",
-        "version": "1.0.1",
-        "orientation": "portrait",
-        "icon": "./assets/logo.png",
-        "scheme": "passcardstore",
-        "userInterfaceStyle": "automatic",
-        "ios": {
-            "icon": "./assets/logo.png"
-        },
-        "android": {
-            "adaptiveIcon": {
-                "backgroundColor": "#F6F2EB",
-                "foregroundImage": "./assets/logo.png",
-                "backgroundImage": "./assets/logo.png",
-                "monochromeImage": "./assets/logo.png"
-            },
-            "predictiveBackGestureEnabled": false,
-            "package": "com.mohdrafey1.passcardstore",
-            "permissions": [
-                "android.permission.USE_BIOMETRIC",
-                "android.permission.USE_FINGERPRINT"
-            ],
-            "versionCode": 2
-        },
-        "plugins": [
-            "expo-router",
-            [
-                "expo-splash-screen",
-                {
-                    "backgroundColor": "#F6F2EB",
-                    "android": {
-                        "image": "./assets/logo.png",
-                        "imageWidth": 76
-                    }
-                }
-            ],
-            "expo-secure-store",
-            "expo-sharing",
-            "expo-sqlite",
-            "expo-local-authentication",
-            "expo-document-picker",
-            "expo-updates"
-        ],
-        "runtimeVersion": {
-            "policy": "appVersion"
-        },
-        "updates": {
-            "url": "https://u.expo.dev/ef4ccf72-5ad3-4234-bad2-991dd9c96338",
-            "enabled": true,
-            "checkAutomatically": "ON_LOAD",
-            "fallbackToCacheTimeout": 0
-        },
-        "experiments": {
-            "typedRoutes": true,
-            "reactCompiler": true
-        },
-        "extra": {
-            "router": {},
-            "eas": {
-                "projectId": "ef4ccf72-5ad3-4234-bad2-991dd9c96338"
-            }
-        },
-        "owner": "mohdrafey1"
-    }
+  "expo": {
+    "name": "Passcard Store",
+    "slug": "passcard-store",
+    "version": "1.0.1",
+    "orientation": "portrait",
+    "icon": "./assets/logo.png",
+    "scheme": "passcardstore",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "icon": "./assets/logo.png"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#F6F2EB",
+        "foregroundImage": "./assets/logo.png",
+        "backgroundImage": "./assets/logo.png",
+        "monochromeImage": "./assets/logo.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "com.mohdrafey1.passcardstore",
+      "permissions": [
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT"
+      ],
+      "versionCode": 3
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#F6F2EB",
+          "android": {
+            "image": "./assets/logo.png",
+            "imageWidth": 76
+          }
+        }
+      ],
+      "expo-secure-store",
+      "expo-sharing",
+      "expo-sqlite",
+      "expo-local-authentication",
+      "expo-document-picker",
+      "expo-updates"
+    ],
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/ef4ccf72-5ad3-4234-bad2-991dd9c96338",
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    },
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "ef4ccf72-5ad3-4234-bad2-991dd9c96338"
+      }
+    },
+    "owner": "mohdrafey1"
+  }
 }
