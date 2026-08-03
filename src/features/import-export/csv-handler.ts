@@ -6,6 +6,7 @@ import type { CardEntry } from '@/types/card';
 import { passwordRepository } from '@/storage/password-repository';
 import { cardRepository } from '@/storage/card-repository';
 import { cleanupTempFile } from '@/utils/cache';
+import { runWithoutAutoLock } from '@/hooks/useAutoLock';
 import { DEFAULT_CATEGORIES } from '@/constants/categories';
 import * as ExpoCrypto from 'expo-crypto';
 
@@ -62,10 +63,12 @@ export async function exportAndShareCSV(csvContent: string, filename: string): P
   const isAvailable = await Sharing.isAvailableAsync();
   if (isAvailable) {
     try {
-      await Sharing.shareAsync(file.uri, {
-        mimeType: 'text/csv',
-        dialogTitle: `Export ${filename}`,
-      });
+      await runWithoutAutoLock(() =>
+        Sharing.shareAsync(file.uri, {
+          mimeType: 'text/csv',
+          dialogTitle: `Export ${filename}`,
+        }),
+      );
     } finally {
       // Exported CSV is unencrypted plaintext — remove it from cache once shared.
       cleanupTempFile(file.uri);

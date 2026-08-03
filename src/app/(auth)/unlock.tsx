@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import PinPad from '@/components/PinPad';
@@ -21,6 +21,7 @@ export default function UnlockScreen() {
   const [lockedOut, setLockedOut] = useState(false);
   const [lockoutSeconds, setLockoutSeconds] = useState(0);
   const [canBiometric, setCanBiometric] = useState(false);
+  const [verifying, setVerifying] = useState(false);
   const biometricsEnabled = useSettingsStore((s) => s.biometricsEnabled);
   const setAuthenticated = useSettingsStore((s) => s.setAuthenticated);
 
@@ -98,7 +99,13 @@ export default function UnlockScreen() {
       return;
     }
 
-    const valid = await unlockWithPin(pin);
+    setVerifying(true);
+    let valid = false;
+    try {
+      valid = await unlockWithPin(pin);
+    } finally {
+      setVerifying(false);
+    }
     if (valid) {
       resetLockout();
       // Re-provision the biometric key slot for users who had biometrics on
@@ -141,6 +148,12 @@ export default function UnlockScreen() {
           error={error}
         />
       )}
+      {verifying && (
+        <View style={styles.verifyingOverlay} pointerEvents="auto">
+          <ActivityIndicator size="large" color={Colors.primary} />
+          <Text style={styles.verifyingText}>Unlocking…</Text>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -155,6 +168,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: Spacing.xl,
+  },
+  verifyingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(246, 242, 235, 0.7)',
+    gap: Spacing.md,
+  },
+  verifyingText: {
+    fontSize: FontSize.base,
+    fontWeight: '600',
+    color: Colors.textSecondary,
   },
   lockoutTitle: {
     fontSize: FontSize.xl,

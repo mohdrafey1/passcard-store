@@ -11,6 +11,7 @@ import { useCardStore } from '@/features/cards/store';
 import { useSettingsStore } from '@/features/settings/store';
 import { verifyStoredPin, getPinLength } from '@/security/pin';
 import { cleanupTempFile } from '@/utils/cache';
+import { runWithoutAutoLock } from '@/hooks/useAutoLock';
 import PinModal from '@/components/PinModal';
 
 export default function BackupScreen() {
@@ -68,11 +69,13 @@ export default function BackupScreen() {
       // can't map to a MIME type, so any narrower filter (or the OS itself)
       // greys the file out in the picker. copyToCacheDirectory guarantees a
       // readable local URI regardless of which provider it came from.
-      const doc = await DocumentPicker.getDocumentAsync({
-        type: '*/*',
-        copyToCacheDirectory: true,
-        multiple: false,
-      });
+      const doc = await runWithoutAutoLock(() =>
+        DocumentPicker.getDocumentAsync({
+          type: '*/*',
+          copyToCacheDirectory: true,
+          multiple: false,
+        }),
+      );
       if (doc.canceled) return;
       const asset = doc.assets[0];
       const uri = asset.uri;

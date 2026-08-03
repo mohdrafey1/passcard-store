@@ -1,10 +1,25 @@
-import { Tabs } from 'expo-router';
+import { useEffect } from 'react';
+import { Tabs, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, FontSize } from '@/constants/theme';
+import { useSettingsStore } from '@/features/settings/store';
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
+  const isAuthenticated = useSettingsStore((s) => s.isAuthenticated);
+  const isPinCreated = useSettingsStore((s) => s.isPinCreated);
+
+  // When the vault locks (auto-lock, manual, etc.) the authenticated flag flips
+  // to false — but nothing navigates away from the tabs on its own. Redirect to
+  // the unlock screen so locking actually takes effect immediately instead of
+  // only after the app is killed. Skip this when there is no PIN (e.g. a full
+  // data wipe in progress), where the root redirect sends the user to setup.
+  useEffect(() => {
+    if (!isAuthenticated && isPinCreated) {
+      router.replace('/(auth)/unlock');
+    }
+  }, [isAuthenticated, isPinCreated]);
 
   return (
     <Tabs
