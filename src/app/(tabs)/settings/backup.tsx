@@ -56,19 +56,44 @@ export default function BackupScreen() {
     }
   };
 
+  const proceedWithRestore = (uri: string) => {
+    setRestoreUri(uri);
+    setPin('');
+    setMode('restore-pin');
+  };
+
   const handlePickRestore = async () => {
     try {
-      const doc = await DocumentPicker.getDocumentAsync({ type: '*/*' });
+      // Accept ALL file types. `.vaultx` is a custom extension that Android
+      // can't map to a MIME type, so any narrower filter (or the OS itself)
+      // greys the file out in the picker. copyToCacheDirectory guarantees a
+      // readable local URI regardless of which provider it came from.
+      const doc = await DocumentPicker.getDocumentAsync({
+        type: '*/*',
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
       if (doc.canceled) return;
-      const uri = doc.assets[0].uri;
-      const name = doc.assets[0].name || '';
-      if (!name.endsWith('.vaultx')) {
-        Alert.alert('Invalid File', 'Please select a .vaultx backup file');
+      const asset = doc.assets[0];
+      const uri = asset.uri;
+      const name = (asset.name || '').toLowerCase();
+
+      // Do NOT hard-block on the extension: some providers return a display
+      // name without ".vaultx". Validation happens for real when we try to
+      // decrypt the file (it carries a magic header). If the name clearly
+      // isn't a backup, just confirm before continuing.
+      if (name && !name.endsWith('.vaultx')) {
+        Alert.alert(
+          'Use this file?',
+          "This doesn't look like a .vaultx backup, but some file managers hide the extension. If this is your Passcard backup, continue.",
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Continue', onPress: () => proceedWithRestore(uri) },
+          ],
+        );
         return;
       }
-      setRestoreUri(uri);
-      setPin('');
-      setMode('restore-pin');
+      proceedWithRestore(uri);
     } catch (e) {
       Alert.alert('Error', 'Failed to pick file');
     }
