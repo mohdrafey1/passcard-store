@@ -1,0 +1,118 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1024px; height: 500px; background: #140e0a; }
+      body { font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; overflow: hidden; }
+      .frame {
+        position: absolute; inset: 0;
+        width: 1024px; height: 500px;
+        background:
+          radial-gradient(680px 520px at 78% 16%, rgba(216,154,28,0.30), transparent 60%),
+          radial-gradient(700px 600px at 6% 112%, rgba(240,193,75,0.10), transparent 60%),
+          linear-gradient(145deg, #1c140e 0%, #251a12 55%, #140e0a 100%);
+        overflow: hidden;
+      }
+      .rings {
+        position: absolute; top: -190px; right: -150px;
+        width: 620px; height: 620px; border-radius: 50%;
+        border: 1px solid rgba(240,193,75,0.10);
+        box-shadow: 0 0 0 60px rgba(240,193,75,0.045),
+                    0 0 0 130px rgba(240,193,75,0.03),
+                    0 0 0 210px rgba(240,193,75,0.02);
+      }
+      .content { position: absolute; left: 72px; top: 96px; width: 540px; }
+      .brandrow { display: flex; align-items: center; gap: 16px; margin-bottom: 22px; }
+      .badge {
+        width: 68px; height: 68px; border-radius: 19px;
+        background: linear-gradient(160deg, #2c2018, #191109);
+        border: 2px solid #d89a1c; display: grid; place-items: center;
+        box-shadow: 0 12px 30px rgba(0,0,0,0.45);
+      }
+      .badge svg { width: 38px; height: 38px; }
+      .kicker { color: #f0c14b; font-weight: 800; letter-spacing: 3px; font-size: 15px; text-transform: uppercase; }
+      h1 { color: #fff; font-size: 66px; line-height: 1.0; font-weight: 800; letter-spacing: -1.5px; margin-bottom: 20px; white-space: nowrap; }
+      h1 .accent { color: #f0c14b; }
+      .tag { color: #dccfbb; font-size: 23px; font-weight: 500; line-height: 1.35; margin-bottom: 26px; max-width: 450px; }
+      .pills { display: flex; gap: 12px; }
+      .pill {
+        display: inline-flex; align-items: center; gap: 8px;
+        padding: 9px 16px; border-radius: 999px;
+        background: rgba(240,193,75,0.10); border: 1px solid rgba(240,193,75,0.35);
+        color: #f4e6c7; font-size: 16px; font-weight: 700;
+      }
+      .pill .dot { width: 8px; height: 8px; border-radius: 50%; background: #57a437; }
+
+      .visual { position: absolute; right: 40px; top: 0; height: 500px; width: 360px; }
+      .shieldbig { position: absolute; right: 34px; top: 104px; width: 300px; height: 300px; filter: drop-shadow(0 24px 50px rgba(0,0,0,0.55)); }
+      .card {
+        position: absolute; right: 70px; top: 198px;
+        width: 244px; height: 150px; border-radius: 18px;
+        background: linear-gradient(150deg, #f3c95c 0%, #d89a1c 55%, #b07e15 100%);
+        box-shadow: 0 22px 44px rgba(0,0,0,0.5);
+        transform: rotate(-8deg); padding: 16px 18px; color: #241a10;
+      }
+      .chip { width: 38px; height: 28px; border-radius: 6px; background: linear-gradient(160deg, #fdeecb, #caa24d); border: 1px solid rgba(0,0,0,0.15); margin-bottom: 16px; }
+      .cnum { font-family: "Courier New", monospace; font-size: 15px; letter-spacing: 0.5px; font-weight: 700; white-space: nowrap; }
+      .crow { display: flex; justify-content: space-between; margin-top: 14px; font-size: 11px; font-weight: 700; opacity: 0.82; letter-spacing: 0.5px; }
+      .lockchip {
+        position: absolute; right: 44px; top: 150px;
+        width: 58px; height: 58px; border-radius: 16px;
+        background: #16100a; border: 1px solid rgba(240,193,75,0.4);
+        display: grid; place-items: center; box-shadow: 0 14px 30px rgba(0,0,0,0.5); transform: rotate(7deg);
+      }
+      .lockchip svg { width: 28px; height: 28px; }
+    </style>
+  </head>
+  <body>
+    <div class="frame">
+      <div class="rings"></div>
+
+      <div class="content">
+        <div class="brandrow">
+          <div class="badge">
+            <svg viewBox="0 0 48 48" fill="none">
+              <path d="M24 3l16 6v11c0 10.5-6.8 18.7-16 22-9.2-3.3-16-11.5-16-22V9l16-6z" fill="#d89a1c"/>
+              <path d="M16.5 24.5l5 5 10-10.5" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div class="kicker">Offline &middot; Encrypted</div>
+        </div>
+        <h1>Passcard <span class="accent">Store</span></h1>
+        <p class="tag">Your passwords &amp; cards, locked to your device with AES-256.</p>
+        <div class="pills">
+          <span class="pill"><span class="dot"></span>No cloud</span>
+          <span class="pill"><span class="dot"></span>No account</span>
+          <span class="pill"><span class="dot"></span>No tracking</span>
+        </div>
+      </div>
+
+      <div class="visual">
+        <svg class="shieldbig" viewBox="0 0 48 48" fill="none">
+          <path d="M24 3l16 6v11c0 10.5-6.8 18.7-16 22-9.2-3.3-16-11.5-16-22V9l16-6z" fill="url(#g)" stroke="#f0c14b" stroke-width="0.5"/>
+          <defs>
+            <linearGradient id="g" x1="8" y1="3" x2="40" y2="42" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#3a2a1c"/><stop offset="1" stop-color="#1c130c"/>
+            </linearGradient>
+          </defs>
+        </svg>
+
+        <div class="lockchip">
+          <svg viewBox="0 0 24 24" fill="none">
+            <rect x="4" y="10" width="16" height="11" rx="2.5" fill="#f0c14b"/>
+            <path d="M7.5 10V7.5a4.5 4.5 0 0 1 9 0V10" stroke="#f0c14b" stroke-width="2.2"/>
+            <circle cx="12" cy="15.5" r="1.8" fill="#16100a"/>
+          </svg>
+        </div>
+
+        <div class="card">
+          <div class="chip"></div>
+          <div class="cnum">&bull;&bull;&bull;&bull; &bull;&bull;&bull;&bull; &bull;&bull;&bull;&bull; 4321</div>
+          <div class="crow"><span>PASSCARD</span><span>08/29</span></div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
