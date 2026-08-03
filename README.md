@@ -17,6 +17,7 @@ A production-grade, fully offline secure vault for passwords and cards — built
 - **AES-256-CBC Encryption** — Every sensitive record encrypted at rest with a per-record random IV
 - **CSPRNG Password Generator** — Generated passwords use the device's cryptographically secure RNG (never `Math.random()`)
 - **Biometric Unlock** — Fingerprint / Face authentication support
+- **Screenshot & Recents Protection** — Android `FLAG_SECURE` blocks screenshots/screen recording and hides vault contents in the app switcher
 - **Lockout Protection** — 5 failed attempts → 60 second lockout, **persisted across app restarts** and applied to biometric failures too
 - **Auto-Lock** — Configurable lock on app background (immediate / 30s / 1m / 5m / 15m)
 - **Clipboard Auto-Clear** — Automatically clears copied data after 15s / 30s / 60s
