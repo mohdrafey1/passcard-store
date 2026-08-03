@@ -3,6 +3,7 @@ import * as Sharing from 'expo-sharing';
 import type { PasswordEntry } from '@/types/password';
 import type { CardEntry } from '@/types/card';
 import { cleanupTempFile } from '@/utils/cache';
+import { runWithoutAutoLock } from '@/hooks/useAutoLock';
 
 /**
  * Format a password entry as shareable plain text
@@ -47,10 +48,12 @@ export async function shareText(text: string, filename = 'passcard-share.txt'): 
   file.write(text);
 
   try {
-    await Sharing.shareAsync(file.uri, {
-      mimeType: 'text/plain',
-      dialogTitle: 'Share from Passcard Store',
-    });
+    await runWithoutAutoLock(() =>
+      Sharing.shareAsync(file.uri, {
+        mimeType: 'text/plain',
+        dialogTitle: 'Share from Passcard Store',
+      }),
+    );
   } finally {
     // This file holds decrypted secrets in plaintext — never leave it on disk.
     cleanupTempFile(file.uri);

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import PinPad from '@/components/PinPad';
@@ -14,6 +14,7 @@ export default function CreatePinScreen() {
   const [pinLength, setPinLength] = useState<4 | 6>(4);
   const [firstPin, setFirstPin] = useState('');
   const [error, setError] = useState('');
+  const [creating, setCreating] = useState(false);
   const initialize = useSettingsStore((s) => s.initialize);
   const setAuthenticated = useSettingsStore((s) => s.setAuthenticated);
 
@@ -36,6 +37,7 @@ export default function CreatePinScreen() {
       return;
     }
 
+    setCreating(true);
     try {
       await createPin(pin);
       // Provision the data key wrapped under this PIN and open the session, so
@@ -48,6 +50,8 @@ export default function CreatePinScreen() {
       setError('Failed to create PIN. Please try again.');
       setStep('create');
       setFirstPin('');
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -106,6 +110,12 @@ export default function CreatePinScreen() {
         }
         error={error}
       />
+      {creating && (
+        <View style={styles.creatingOverlay}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+          <Text style={styles.creatingText}>Setting up your vault…</Text>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -114,6 +124,18 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
+  },
+  creatingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(246, 242, 235, 0.7)',
+    gap: Spacing.md,
+  },
+  creatingText: {
+    fontSize: FontSize.base,
+    fontWeight: '600',
+    color: Colors.textSecondary,
   },
   selectContainer: {
     flex: 1,

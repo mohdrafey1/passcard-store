@@ -10,6 +10,7 @@ import { importPasswordsFromCSV, importCardsFromCSV, type ImportResult } from '@
 import { usePasswordStore } from '@/features/passwords/store';
 import { useCardStore } from '@/features/cards/store';
 import { verifyStoredPin, getPinLength } from '@/security/pin';
+import { runWithoutAutoLock } from '@/hooks/useAutoLock';
 import PinModal from '@/components/PinModal';
 
 export default function ImportScreen() {
@@ -49,7 +50,9 @@ export default function ImportScreen() {
 
   const runImport = async (type: 'passwords' | 'cards') => {
     try {
-      const doc = await DocumentPicker.getDocumentAsync({ type: ['text/csv', 'text/comma-separated-values', '*/*'] });
+      const doc = await runWithoutAutoLock(() =>
+        DocumentPicker.getDocumentAsync({ type: ['text/csv', 'text/comma-separated-values', '*/*'] }),
+      );
       if (doc.canceled) return;
 
       setLoading(true);

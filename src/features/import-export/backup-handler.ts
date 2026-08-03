@@ -5,6 +5,7 @@ import CryptoJS from 'crypto-js';
 import { passwordRepository } from '@/storage/password-repository';
 import { cardRepository } from '@/storage/card-repository';
 import { getDatabase } from '@/storage/database';
+import { runWithoutAutoLock } from '@/hooks/useAutoLock';
 import { loadSettings, saveSetting } from '@/storage/settings-storage';
 import type { PasswordEntry } from '@/types/password';
 import type { CardEntry } from '@/types/card';
@@ -12,10 +13,14 @@ import type { AppSettings } from '@/types/settings';
 
 const BACKUP_VERSION = 1;
 const BACKUP_MAGIC = 'PASSCARD_VAULT';
-// A high iteration count is affordable here because backups are infrequent.
-const BACKUP_ITERATIONS = 210_000;
-// Old builds used a single hard-coded salt and 5k iterations. Kept only so
-// existing backups can still be restored.
+// crypto-js PBKDF2 is pure JS and slow on real devices; a 4–6 digit PIN gains
+// little from a huge iteration count, so keep this modest for a fast backup /
+// restore. The per-backup random salt is what actually defeats precomputation.
+const BACKUP_ITERATIONS = 30_000;
+// An earlier build used a random salt with 210k iterations and a 3-part file
+// format (no stored count). Kept so those backups still restore.
+const V2_ITERATIONS = 210_000;
+// The first build used a single hard-coded salt and 5k iterations (2-part file).
 const LEGACY_ITERATIONS = 5_000;
 const LEGACY_SALT = 'passcard-backup-salt-v1';
 
@@ -39,11 +44,11 @@ function bytesToHex(bytes: Uint8Array): string {
  * A random salt makes each backup's key unique, defeating precomputation and
  * cross-file/cross-user attacks that a shared static salt would allow.
  */
-function deriveBackupKey(pin: string, saltHex: string): string {
+function deriveBackupKey(pin: string, saltHex: string, iterations: number): string {
   const salt = CryptoJS.enc.Hex.parse(saltHex);
   return CryptoJS.PBKDF2(pin, salt, {
     keySize: 256 / 32,
-    iterations: BACKUP_ITERATIONS,
+    iterations,
   }).toString(CryptoJS.enc.Hex);
 }
 
@@ -75,7 +80,7 @@ export async function createBackup(pin: string): Promise<string> {
 
   const jsonString = JSON.stringify(payload);
   const saltHex = bytesToHex(ExpoCrypto.getRandomBytes(16));
-  const backupKey = deriveBackupKey(pin, saltHex);
+  const backupKey = deriveBackupKey(pin, saltHex, BACKUP_ITERATIONS);
   const keyWordArray = CryptoJS.enc.Hex.parse(backupKey);
   const ivHex = bytesToHex(ExpoCrypto.getRandomBytes(16));
   const iv = CryptoJS.enc.Hex.parse(ivHex);
@@ -86,7 +91,8 @@ export async function createBackup(pin: string): Promise<string> {
     padding: CryptoJS.pad.Pkcs7,
   });
 
-  const backupContent = `${saltHex}:${ivHex}:${encrypted.toString()}`;
+  // Format: salt : iterations : iv : ciphertext
+  const backupContent = `${saltHex}:${BACKUP_ITERATIONS}:${ivHex}:${encrypted.toString()}`;
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   // Use a .txt extension so Android's file picker can always select the file
@@ -109,10 +115,12 @@ export async function shareBackup(fileUri: string): Promise<void> {
     throw new Error('Sharing is not available on this device');
   }
 
-  await Sharing.shareAsync(fileUri, {
-    mimeType: 'text/plain',
-    dialogTitle: 'Save Passcard Backup',
-  });
+  await runWithoutAutoLock(() =>
+    Sharing.shareAsync(fileUri, {
+      mimeType: 'text/plain',
+      dialogTitle: 'Save Passcard Backup',
+    }),
+  );
 }
 
 /**
@@ -126,13 +134,19 @@ function decryptBackup(content: string, pin: string): BackupPayload {
   let ivHex: string;
   let ciphertext: string;
 
-  if (parts.length === 3) {
-    // New format: salt:iv:ciphertext
-    saltDerivedKey = deriveBackupKey(pin, parts[0]);
+  if (parts.length === 4) {
+    // Current format: salt:iterations:iv:ciphertext
+    const iterations = parseInt(parts[1], 10) || BACKUP_ITERATIONS;
+    saltDerivedKey = deriveBackupKey(pin, parts[0], iterations);
+    ivHex = parts[2];
+    ciphertext = parts[3];
+  } else if (parts.length === 3) {
+    // Earlier format: salt:iv:ciphertext (fixed 210k iterations)
+    saltDerivedKey = deriveBackupKey(pin, parts[0], V2_ITERATIONS);
     ivHex = parts[1];
     ciphertext = parts[2];
   } else if (parts.length === 2) {
-    // Legacy format: iv:ciphertext (static salt)
+    // First format: iv:ciphertext (static salt, 5k iterations)
     saltDerivedKey = deriveLegacyBackupKey(pin);
     ivHex = parts[0];
     ciphertext = parts[1];

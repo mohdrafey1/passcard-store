@@ -21,13 +21,21 @@ import { verifyStoredPin } from './pin';
 
 const WRAPPED_KEY = 'VAULT_KEY_WRAPPED';
 const WRAP_SALT = 'VAULT_KEY_SALT';
+const WRAP_ITERS = 'VAULT_KEY_ITERS';
 const BIOMETRIC_KEY = 'VAULT_KEY_BIOMETRIC';
 const LEGACY_KEY = 'VAULT_ENCRYPTION_KEY'; // plaintext key from pre-KEK builds
 
 // Prefix stored inside the wrapped blob so a wrong PIN is detected reliably
 // (AES-CBC/PKCS7 does not always throw on a wrong key).
 const KEY_MARKER = 'PCSKv1:';
-const KEK_ITERATIONS = 100_000;
+
+// crypto-js PBKDF2 is pure JS and slow on real devices. The PIN is only 4–6
+// digits, so a very high iteration count adds little brute-force resistance
+// while making unlock take many seconds. Keep it modest for a snappy unlock.
+const KEK_ITERATIONS = 10_000;
+// Builds before the iteration count was persisted used 100k; assume that for
+// any wrapped key that has no stored count, then migrate it down on unlock.
+const LEGACY_KEK_ITERATIONS = 100_000;
 
 // In-memory session data key. Set on unlock, cleared on lock/wipe.
 let sessionKey: string | null = null;
@@ -38,18 +46,18 @@ function bytesToHex(bytes: Uint8Array): string {
     .join('');
 }
 
-function deriveKek(pin: string, saltHex: string): string {
+function deriveKek(pin: string, saltHex: string, iterations: number): string {
   const salt = CryptoJS.enc.Hex.parse(saltHex);
   return CryptoJS.PBKDF2(pin, salt, {
     keySize: 256 / 32,
-    iterations: KEK_ITERATIONS,
+    iterations,
   }).toString(CryptoJS.enc.Hex);
 }
 
 /** Wrap `dataKey` under a fresh PIN-derived KEK and persist it. */
 async function wrapAndStore(dataKey: string, pin: string): Promise<void> {
   const saltHex = bytesToHex(ExpoCrypto.getRandomBytes(16));
-  const kek = deriveKek(pin, saltHex);
+  const kek = deriveKek(pin, saltHex, KEK_ITERATIONS);
   const wrapped = encrypt(KEY_MARKER + dataKey, kek);
   // Verify the round-trip before persisting so we can never lock the user out.
   const check = decrypt(wrapped, kek);
@@ -57,13 +65,14 @@ async function wrapAndStore(dataKey: string, pin: string): Promise<void> {
     throw new Error('Key wrap verification failed');
   }
   await SecureStore.setItemAsync(WRAP_SALT, saltHex);
+  await SecureStore.setItemAsync(WRAP_ITERS, String(KEK_ITERATIONS));
   await SecureStore.setItemAsync(WRAPPED_KEY, wrapped);
 }
 
 /** Attempt to unwrap the stored key with `pin`. Returns null on wrong PIN. */
-function tryUnwrap(pin: string, wrapped: string, saltHex: string): string | null {
+function tryUnwrap(pin: string, wrapped: string, saltHex: string, iterations: number): string | null {
   try {
-    const kek = deriveKek(pin, saltHex);
+    const kek = deriveKek(pin, saltHex, iterations);
     const plain = decrypt(wrapped, kek);
     if (!plain.startsWith(KEY_MARKER)) return null;
     return plain.slice(KEY_MARKER.length);
@@ -111,9 +120,16 @@ export async function unlockWithPin(pin: string): Promise<boolean> {
   const saltHex = await SecureStore.getItemAsync(WRAP_SALT);
 
   if (wrapped && saltHex) {
-    const key = tryUnwrap(pin, wrapped, saltHex);
+    const itersStr = await SecureStore.getItemAsync(WRAP_ITERS);
+    const iterations = itersStr ? parseInt(itersStr, 10) : LEGACY_KEK_ITERATIONS;
+    const key = tryUnwrap(pin, wrapped, saltHex, iterations);
     if (!key) return false;
     sessionKey = key;
+    // If this key was wrapped with a slow/legacy iteration count, re-wrap it at
+    // the current (faster) count so future unlocks aren't slow.
+    if (iterations !== KEK_ITERATIONS) {
+      await wrapAndStore(key, pin).catch(() => {});
+    }
     return true;
   }
 
@@ -125,8 +141,6 @@ export async function unlockWithPin(pin: string): Promise<boolean> {
   if (!legacy) return false;
   const pinOk = await verifyStoredPin(pin);
   if (!pinOk) return false;
-  // Wrap the legacy key under the supplied PIN (verified internally), then drop
-  // the plaintext copy.
   await wrapAndStore(legacy, pin);
   await SecureStore.deleteItemAsync(LEGACY_KEY).catch(() => {});
   sessionKey = legacy;
@@ -171,6 +185,7 @@ export async function wipeKeys(): Promise<void> {
   await Promise.all([
     SecureStore.deleteItemAsync(WRAPPED_KEY).catch(() => {}),
     SecureStore.deleteItemAsync(WRAP_SALT).catch(() => {}),
+    SecureStore.deleteItemAsync(WRAP_ITERS).catch(() => {}),
     SecureStore.deleteItemAsync(BIOMETRIC_KEY).catch(() => {}),
     SecureStore.deleteItemAsync(LEGACY_KEY).catch(() => {}),
   ]);

@@ -7,6 +7,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as Updates from 'expo-updates';
 import { Ionicons } from '@expo/vector-icons';
+import { usePreventScreenCapture } from 'expo-screen-capture';
 import { useSettingsStore } from '@/features/settings/store';
 import { purgeExportCache } from '@/utils/cache';
 import { Colors, FontSize, Spacing } from '@/constants/theme';
@@ -107,6 +108,9 @@ export default function RootLayout() {
   const initialize = useSettingsStore((s) => s.initialize);
   const [bootError, setBootError] = useState(false);
 
+  // Set Android FLAG_SECURE for the whole app: blocks screenshots/screen
+  // recording and hides vault contents in the app-switcher / recents preview.
+  usePreventScreenCapture();
   useAutoLock();
 
   const boot = useCallback(async () => {
