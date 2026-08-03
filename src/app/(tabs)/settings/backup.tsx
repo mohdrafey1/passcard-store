@@ -56,19 +56,46 @@ export default function BackupScreen() {
     }
   };
 
+  const proceedWithRestore = (uri: string) => {
+    setRestoreUri(uri);
+    setPin('');
+    setMode('restore-pin');
+  };
+
   const handlePickRestore = async () => {
     try {
-      const doc = await DocumentPicker.getDocumentAsync({ type: '*/*' });
+      // Accept ALL file types. `.vaultx` is a custom extension that Android
+      // can't map to a MIME type, so any narrower filter (or the OS itself)
+      // greys the file out in the picker. copyToCacheDirectory guarantees a
+      // readable local URI regardless of which provider it came from.
+      const doc = await DocumentPicker.getDocumentAsync({
+        type: '*/*',
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
       if (doc.canceled) return;
-      const uri = doc.assets[0].uri;
-      const name = doc.assets[0].name || '';
-      if (!name.endsWith('.vaultx')) {
-        Alert.alert('Invalid File', 'Please select a .vaultx backup file');
+      const asset = doc.assets[0];
+      const uri = asset.uri;
+      const name = (asset.name || '').toLowerCase();
+
+      // Do NOT hard-block on the extension: some providers return a display
+      // name without an extension. Validation happens for real when we try to
+      // decrypt the file (it carries a magic header). Backups are saved as
+      // .txt now (older ones were .vaultx); anything else just gets a soft
+      // confirmation.
+      const looksLikeBackup = name.endsWith('.txt') || name.endsWith('.vaultx');
+      if (name && !looksLikeBackup) {
+        Alert.alert(
+          'Use this file?',
+          "This doesn't look like a Passcard backup, but some file managers hide the extension. If this is your backup file, continue.",
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Continue', onPress: () => proceedWithRestore(uri) },
+          ],
+        );
         return;
       }
-      setRestoreUri(uri);
-      setPin('');
-      setMode('restore-pin');
+      proceedWithRestore(uri);
     } catch (e) {
       Alert.alert('Error', 'Failed to pick file');
     }
@@ -155,7 +182,7 @@ export default function BackupScreen() {
               </View>
               <View style={styles.actionText}>
                 <Text style={styles.actionTitle}>Create Backup</Text>
-                <Text style={styles.actionHint}>Encrypted .vaultx file with all your data</Text>
+                <Text style={styles.actionHint}>Encrypted backup file with all your data</Text>
               </View>
             </TouchableOpacity>
             <TouchableOpacity style={styles.actionButton} onPress={handlePickRestore} accessibilityRole="button" accessibilityLabel="Restore backup">
@@ -164,7 +191,7 @@ export default function BackupScreen() {
               </View>
               <View style={styles.actionText}>
                 <Text style={styles.actionTitle}>Restore Backup</Text>
-                <Text style={styles.actionHint}>Import from a .vaultx backup file (replaces current data)</Text>
+                <Text style={styles.actionHint}>Import from a backup file (replaces current data)</Text>
               </View>
             </TouchableOpacity>
           </>

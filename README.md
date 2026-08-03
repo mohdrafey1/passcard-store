@@ -20,7 +20,7 @@ A production-grade, fully offline secure vault for passwords and cards — built
 - **Lockout Protection** — 5 failed attempts → 60 second lockout, **persisted across app restarts** and applied to biometric failures too
 - **Auto-Lock** — Configurable lock on app background (immediate / 30s / 1m / 5m / 15m)
 - **Clipboard Auto-Clear** — Automatically clears copied data after 15s / 30s / 60s
-- **Encrypted Backups** — `.vaultx` files use AES-256 with a **per-backup random salt** and 210k PBKDF2 iterations
+- **Encrypted Backups** — backup files use AES-256 with a **per-backup random salt** and 210k PBKDF2 iterations (saved as `.txt` so any file manager can select them for restore; the contents are fully encrypted)
 - **Re-authentication** — Deleting all data and creating a backup require re-entering your PIN
 - **Secure metadata note** — Search index columns (titles, websites, emails, cardholder names, last 4 digits) are stored unencrypted for fast search; everything sensitive (passwords, full card numbers, CVVs) is always encrypted
 
@@ -49,7 +49,7 @@ A production-grade, fully offline secure vault for passwords and cards — built
 ### 📦 Import / Export / Backup
 - **CSV Import** — Import passwords or cards from CSV files with duplicate detection
 - **CSV Export** — Export all data as CSV via native share sheet
-- **Encrypted Backup** — Create `.vaultx` backup files encrypted with AES-256
+- **Encrypted Backup** — Create AES-256 encrypted backup files (PIN-required)
 - **Restore** — Restore from encrypted backup with PIN verification
 
 ### ⚙️ Settings

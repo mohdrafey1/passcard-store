@@ -89,7 +89,11 @@ export async function createBackup(pin: string): Promise<string> {
   const backupContent = `${saltHex}:${ivHex}:${encrypted.toString()}`;
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-  const filename = `passcard-backup-${timestamp}.vaultx`;
+  // Use a .txt extension so Android's file picker can always select the file
+  // when restoring. A custom extension like ".vaultx" has no MIME mapping and
+  // gets greyed out in many file managers. The contents are still fully
+  // AES-256 encrypted — the extension only affects how the OS lists the file.
+  const filename = `passcard-backup-${timestamp}.txt`;
   const file = new File(Paths.cache, filename);
   file.write(backupContent);
 
@@ -106,7 +110,7 @@ export async function shareBackup(fileUri: string): Promise<void> {
   }
 
   await Sharing.shareAsync(fileUri, {
-    mimeType: 'application/octet-stream',
+    mimeType: 'text/plain',
     dialogTitle: 'Save Passcard Backup',
   });
 }

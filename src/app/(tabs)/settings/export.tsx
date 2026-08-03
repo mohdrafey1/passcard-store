@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -7,9 +7,19 @@ import { Colors, FontSize, Spacing, BorderRadius } from '@/constants/theme';
 import { exportPasswordsToCSV, exportCardsToCSV, exportAndShareCSV } from '@/features/import-export/csv-handler';
 import { passwordRepository } from '@/storage/password-repository';
 import { cardRepository } from '@/storage/card-repository';
+import { verifyStoredPin, getPinLength } from '@/security/pin';
+import PinModal from '@/components/PinModal';
 
 export default function ExportScreen() {
   const [loading, setLoading] = useState(false);
+  const [pinLength, setPinLength] = useState<4 | 6>(4);
+  const [pinVisible, setPinVisible] = useState(false);
+  const [pinError, setPinError] = useState('');
+  const [pendingType, setPendingType] = useState<'passwords' | 'cards' | null>(null);
+
+  useEffect(() => {
+    getPinLength().then(setPinLength);
+  }, []);
 
   const runExport = async (type: 'passwords' | 'cards') => {
     setLoading(true);
@@ -38,16 +48,24 @@ export default function ExportScreen() {
     }
   };
 
+  // Exporting requires re-entering the PIN, so an unlocked phone left
+  // unattended can't be used to dump the vault to a plaintext CSV.
   const handleExport = (type: 'passwords' | 'cards') => {
-    // CSV export is UNENCRYPTED plaintext — make sure the user understands.
-    Alert.alert(
-      'Export as plain text?',
-      `Your ${type} will be exported as an unencrypted CSV file readable by anyone who opens it. Only share it somewhere you trust.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Export', style: 'destructive', onPress: () => runExport(type) },
-      ],
-    );
+    setPendingType(type);
+    setPinError('');
+    setPinVisible(true);
+  };
+
+  const handlePinComplete = async (pin: string) => {
+    const ok = await verifyStoredPin(pin);
+    if (!ok) {
+      setPinError('Incorrect PIN.');
+      return;
+    }
+    setPinVisible(false);
+    const type = pendingType;
+    setPendingType(null);
+    if (type) runExport(type);
   };
 
   return (
@@ -70,7 +88,9 @@ export default function ExportScreen() {
           <>
             <Text style={styles.description}>
               Export your data as CSV files.{'\n'}
-              Files will be shared via the native share sheet.
+              You'll be asked for your PIN first. Note: CSV files are{' '}
+              <Text style={{ fontWeight: '700', color: Colors.danger }}>not encrypted</Text> —
+              only share them somewhere you trust.
             </Text>
             <TouchableOpacity style={styles.exportButton} onPress={() => handleExport('passwords')}>
               <Ionicons name="key-outline" size={24} color={Colors.primary} />
@@ -89,6 +109,16 @@ export default function ExportScreen() {
           </>
         )}
       </View>
+
+      <PinModal
+        visible={pinVisible}
+        pinLength={pinLength}
+        title="Confirm Your PIN"
+        subtitle="Enter your PIN to export data"
+        error={pinError}
+        onComplete={handlePinComplete}
+        onClose={() => { setPinVisible(false); setPendingType(null); }}
+      />
     </SafeAreaView>
   );
 }
