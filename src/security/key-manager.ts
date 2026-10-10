@@ -1,192 +1,363 @@
 import * as ExpoCrypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
-import CryptoJS from 'crypto-js';
-import { encrypt, decrypt, generateEncryptionKey } from './encryption';
-import { verifyStoredPin } from './pin';
+import { importAeadKey, open, seal, type AeadKey } from './aead';
+import { bytesToHex, hexToBytes, utf8Encode, wipeBytes } from './bytes';
+import { createKdfParams, deriveKey, isKdfParams, type KdfParams } from './kdf';
+import { legacyDecrypt, legacyPbkdf2Hex, legacyVerifyPinHash } from './legacy';
 
 /**
  * Key manager
  * -----------
- * The vault data key is never stored in plaintext. Instead it is wrapped with a
- * key-encryption-key (KEK) derived from the user's PIN (PBKDF2). The unwrapped
- * data key lives only in memory for the duration of a session, so the encrypted
- * SQLite database cannot be decrypted without the PIN — even on a device where
- * SecureStore contents are extractable.
+ * A random 256-bit data key encrypts every vault record. That key is never
+ * stored in the clear: it lives in a single "key slot", wrapped (AES-256-GCM)
+ * under a key derived from the user's PIN or passphrase with Argon2id. The slot
+ * is one SecureStore value, so changing the PIN is a single atomic write and a
+ * wrong PIN is detected by the GCM tag, with no separate PIN hash to keep in
+ * sync.
  *
- * Biometric unlock is a deliberate convenience trade-off: when the user opts in,
- * a copy of the data key is placed in a separate SecureStore slot so the key can
- * be recovered after an OS biometric prompt without re-deriving from the PIN.
- * Disabling biometrics removes that slot.
+ * Fingerprint unlock keeps a second copy of the data key in SecureStore with
+ * `requireAuthentication`, so Android's hardware keystore only releases it
+ * after a successful biometric match.
+ *
+ * The unwrapped key exists only in memory while the vault is unlocked;
+ * `lockSession()` drops it.
  */
 
-const WRAPPED_KEY = 'VAULT_KEY_WRAPPED';
-const WRAP_SALT = 'VAULT_KEY_SALT';
-const WRAP_ITERS = 'VAULT_KEY_ITERS';
-const BIOMETRIC_KEY = 'VAULT_KEY_BIOMETRIC';
-const LEGACY_KEY = 'VAULT_ENCRYPTION_KEY'; // plaintext key from pre-KEK builds
+export type UnlockMethod = 'pin' | 'passphrase';
 
-// Prefix stored inside the wrapped blob so a wrong PIN is detected reliably
-// (AES-CBC/PKCS7 does not always throw on a wrong key).
-const KEY_MARKER = 'PCSKv1:';
-
-// crypto-js PBKDF2 is pure JS and slow on real devices. The PIN is only 4–6
-// digits, so a very high iteration count adds little brute-force resistance
-// while making unlock take many seconds. Keep it modest for a snappy unlock.
-const KEK_ITERATIONS = 10_000;
-// Builds before the iteration count was persisted used 100k; assume that for
-// any wrapped key that has no stored count, then migrate it down on unlock.
-const LEGACY_KEK_ITERATIONS = 100_000;
-
-// In-memory session data key. Set on unlock, cleared on lock/wipe.
-let sessionKey: string | null = null;
-
-function bytesToHex(bytes: Uint8Array): string {
-  return Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
+export interface UnlockInfo {
+  method: UnlockMethod;
+  /** Digits for a PIN; null for a passphrase. */
+  pinLength: 4 | 6 | null;
 }
 
-function deriveKek(pin: string, saltHex: string, iterations: number): string {
-  const salt = CryptoJS.enc.Hex.parse(saltHex);
-  return CryptoJS.PBKDF2(pin, salt, {
-    keySize: 256 / 32,
-    iterations,
-  }).toString(CryptoJS.enc.Hex);
+interface KeySlot {
+  v: 2;
+  method: UnlockMethod;
+  pinLength?: 4 | 6;
+  kdf: KdfParams;
+  /** Data key sealed under the PIN-derived key. */
+  wrapped: string;
+  /** A constant sealed under the data key, to verify a key released by biometrics. */
+  check: string;
 }
 
-/** Wrap `dataKey` under a fresh PIN-derived KEK and persist it. */
-async function wrapAndStore(dataKey: string, pin: string): Promise<void> {
-  const saltHex = bytesToHex(ExpoCrypto.getRandomBytes(16));
-  const kek = deriveKek(pin, saltHex, KEK_ITERATIONS);
-  const wrapped = encrypt(KEY_MARKER + dataKey, kek);
-  // Verify the round-trip before persisting so we can never lock the user out.
-  const check = decrypt(wrapped, kek);
-  if (check !== KEY_MARKER + dataKey) {
-    throw new Error('Key wrap verification failed');
-  }
-  await SecureStore.setItemAsync(WRAP_SALT, saltHex);
-  await SecureStore.setItemAsync(WRAP_ITERS, String(KEK_ITERATIONS));
-  await SecureStore.setItemAsync(WRAPPED_KEY, wrapped);
+interface Session {
+  keyHex: string;
+  aead: AeadKey;
 }
 
-/** Attempt to unwrap the stored key with `pin`. Returns null on wrong PIN. */
-function tryUnwrap(pin: string, wrapped: string, saltHex: string, iterations: number): string | null {
-  try {
-    const kek = deriveKek(pin, saltHex, iterations);
-    const plain = decrypt(wrapped, kek);
-    if (!plain.startsWith(KEY_MARKER)) return null;
-    return plain.slice(KEY_MARKER.length);
-  } catch {
-    return null;
-  }
-}
+const SLOT_KEY = 'VAULT_KEYSLOT_V2';
+const BIO_KEY = 'VAULT_KEY_BIO_V2';
+const BIO_FLAG = 'VAULT_BIO_ENABLED';
+const BIO_REOFFER = 'VAULT_BIO_REOFFER';
+
+const SLOT_AAD = 'passcard:keyslot:v2';
+const CHECK_AAD = 'passcard:keycheck:v2';
+const CHECK_TEXT = 'passcard-key-check';
+
+// Written by v1.0–v1.1. Read once to migrate, then deleted.
+const LEGACY = {
+  wrapped: 'VAULT_KEY_WRAPPED',
+  salt: 'VAULT_KEY_SALT',
+  iters: 'VAULT_KEY_ITERS',
+  plainKey: 'VAULT_ENCRYPTION_KEY',
+  biometric: 'VAULT_KEY_BIOMETRIC',
+  pinHash: 'PIN_HASH',
+  pinSalt: 'PIN_SALT',
+  pinLength: 'PIN_LENGTH',
+} as const;
+const LEGACY_MARKER = 'PCSKv1:';
+const LEGACY_DEFAULT_ITERS = 100_000;
+
+let session: Session | null = null;
 
 // ---- Session ----
 
-export function getSessionKey(): string {
-  if (!sessionKey) {
-    throw new Error('Vault is locked. Unlock before accessing data.');
+async function openSession(keyBytes: Uint8Array): Promise<void> {
+  session = { keyHex: bytesToHex(keyBytes), aead: await importAeadKey(keyBytes) };
+}
+
+export function getSession(): Session {
+  if (!session) throw new Error('Vault is locked. Unlock before accessing data.');
+  return session;
+}
+
+export function isUnlocked(): boolean {
+  return session !== null;
+}
+
+export function lockSession(): void {
+  session = null;
+}
+
+// ---- Key slot ----
+
+async function buildSlot(
+  dataKey: Uint8Array,
+  secret: string,
+  method: UnlockMethod,
+  pinLength: 4 | 6 | null,
+): Promise<KeySlot> {
+  const kdf = await createKdfParams();
+  const kekBytes = await deriveKey(secret, kdf);
+  try {
+    const kek = await importAeadKey(kekBytes);
+    const wrapped = await seal(kek, dataKey, SLOT_AAD);
+    // Round-trip before anything is persisted so a slot can never lock the
+    // user out of their own data.
+    const back = await open(kek, wrapped, SLOT_AAD);
+    if (bytesToHex(back) !== bytesToHex(dataKey)) throw new Error('Key wrap verification failed');
+    const check = await seal(await importAeadKey(dataKey), utf8Encode(CHECK_TEXT), CHECK_AAD);
+    return {
+      v: 2,
+      method,
+      ...(method === 'pin' && pinLength ? { pinLength } : {}),
+      kdf,
+      wrapped,
+      check,
+    };
+  } finally {
+    wipeBytes(kekBytes);
   }
-  return sessionKey;
 }
 
-export function hasSessionKey(): boolean {
-  return sessionKey !== null;
+async function readSlot(): Promise<KeySlot | null> {
+  const raw = await SecureStore.getItemAsync(SLOT_KEY);
+  if (!raw) return null;
+  try {
+    const slot = JSON.parse(raw) as KeySlot;
+    if (slot.v === 2 && isKdfParams(slot.kdf) && typeof slot.wrapped === 'string') return slot;
+  } catch {
+    // fall through
+  }
+  throw new Error('The vault key is damaged.');
 }
 
-export function clearSessionKey(): void {
-  sessionKey = null;
+async function writeSlot(slot: KeySlot): Promise<void> {
+  await SecureStore.setItemAsync(SLOT_KEY, JSON.stringify(slot));
 }
 
-// ---- Provisioning / unlock ----
-
-/**
- * Create a brand-new data key for a first-time PIN and open the session.
- */
-export async function provisionKeyForNewPin(pin: string): Promise<void> {
-  const dataKey = generateEncryptionKey();
-  await wrapAndStore(dataKey, pin);
-  await SecureStore.deleteItemAsync(LEGACY_KEY).catch(() => {});
-  sessionKey = dataKey;
+/** Returns the data key, or null when `secret` is wrong. */
+async function unwrapSlot(slot: KeySlot, secret: string): Promise<Uint8Array | null> {
+  const kekBytes = await deriveKey(secret, slot.kdf);
+  try {
+    const kek = await importAeadKey(kekBytes);
+    const key = await open(kek, slot.wrapped, SLOT_AAD);
+    return key.length === 32 ? key : null;
+  } catch {
+    return null;
+  } finally {
+    wipeBytes(kekBytes);
+  }
 }
 
-/**
- * Unlock with a PIN. Verifies the PIN by unwrapping the data key (or, for
- * pre-KEK installs, migrates the legacy plaintext key into a wrapped key).
- * Returns true on success and opens the session.
- */
-export async function unlockWithPin(pin: string): Promise<boolean> {
-  const wrapped = await SecureStore.getItemAsync(WRAPPED_KEY);
-  const saltHex = await SecureStore.getItemAsync(WRAP_SALT);
+// ---- Legacy (v1.0–v1.1) ----
 
-  if (wrapped && saltHex) {
-    const itersStr = await SecureStore.getItemAsync(WRAP_ITERS);
-    const iterations = itersStr ? parseInt(itersStr, 10) : LEGACY_KEK_ITERATIONS;
-    const key = tryUnwrap(pin, wrapped, saltHex, iterations);
-    if (!key) return false;
-    sessionKey = key;
-    // If this key was wrapped with a slow/legacy iteration count, re-wrap it at
-    // the current (faster) count so future unlocks aren't slow.
-    if (iterations !== KEK_ITERATIONS) {
-      await wrapAndStore(key, pin).catch(() => {});
+async function legacyUnwrap(pin: string): Promise<string | null> {
+  const [wrapped, salt, iters] = await Promise.all([
+    SecureStore.getItemAsync(LEGACY.wrapped),
+    SecureStore.getItemAsync(LEGACY.salt),
+    SecureStore.getItemAsync(LEGACY.iters),
+  ]);
+  if (wrapped && salt) {
+    try {
+      const kekHex = legacyPbkdf2Hex(pin, salt, iters ? parseInt(iters, 10) : LEGACY_DEFAULT_ITERS);
+      const plain = legacyDecrypt(wrapped, kekHex);
+      return plain.startsWith(LEGACY_MARKER) ? plain.slice(LEGACY_MARKER.length) : null;
+    } catch {
+      return null;
     }
+  }
+  // Oldest builds kept the data key in plaintext next to a PIN hash.
+  const [plainKey, pinHash, pinSalt] = await Promise.all([
+    SecureStore.getItemAsync(LEGACY.plainKey),
+    SecureStore.getItemAsync(LEGACY.pinHash),
+    SecureStore.getItemAsync(LEGACY.pinSalt),
+  ]);
+  if (plainKey && pinHash && pinSalt && legacyVerifyPinHash(pin, pinHash, pinSalt)) return plainKey;
+  return null;
+}
+
+async function deleteLegacyKeys(): Promise<void> {
+  await Promise.all(
+    Object.values(LEGACY).map((k) => SecureStore.deleteItemAsync(k).catch(() => {})),
+  );
+}
+
+// ---- Public API ----
+
+/** True when a vault exists on this device (current or legacy format). */
+export async function hasVault(): Promise<boolean> {
+  const [slot, wrapped, pinHash] = await Promise.all([
+    SecureStore.getItemAsync(SLOT_KEY),
+    SecureStore.getItemAsync(LEGACY.wrapped),
+    SecureStore.getItemAsync(LEGACY.pinHash),
+  ]);
+  return slot !== null || wrapped !== null || pinHash !== null;
+}
+
+export async function getUnlockInfo(): Promise<UnlockInfo> {
+  const slot = await readSlot();
+  if (slot) {
+    return slot.method === 'pin'
+      ? { method: 'pin', pinLength: slot.pinLength ?? 6 }
+      : { method: 'passphrase', pinLength: null };
+  }
+  const legacyLength = await SecureStore.getItemAsync(LEGACY.pinLength);
+  return { method: 'pin', pinLength: legacyLength === '6' ? 6 : 4 };
+}
+
+/** Create a brand-new vault key protected by `secret`, and open the session. */
+export async function createVault(secret: string, method: UnlockMethod, pinLength: 4 | 6 | null): Promise<void> {
+  const dataKey = ExpoCrypto.getRandomBytes(32);
+  try {
+    await writeSlot(await buildSlot(dataKey, secret, method, pinLength));
+    await deleteLegacyKeys();
+    await openSession(dataKey);
+  } finally {
+    wipeBytes(dataKey);
+  }
+}
+
+/**
+ * Unlock with a PIN or passphrase. A vault from v1.0–v1.1 is upgraded to the
+ * current key slot on its first successful unlock. Returns false on a wrong
+ * secret.
+ */
+export async function unlockWithSecret(secret: string): Promise<boolean> {
+  const slot = await readSlot();
+  if (slot) {
+    const key = await unwrapSlot(slot, secret);
+    if (!key) return false;
+    await openSession(key);
+    wipeBytes(key);
     return true;
   }
 
-  // Legacy migration path: a plaintext key exists from an older build. Here the
-  // wrapped key isn't available to validate the PIN, so verify against the
-  // stored PIN hash BEFORE migrating — otherwise a wrong PIN would re-wrap the
-  // key under the wrong secret and lock the user out of their own data.
-  const legacy = await SecureStore.getItemAsync(LEGACY_KEY);
-  if (!legacy) return false;
-  const pinOk = await verifyStoredPin(pin);
-  if (!pinOk) return false;
-  await wrapAndStore(legacy, pin);
-  await SecureStore.deleteItemAsync(LEGACY_KEY).catch(() => {});
-  sessionKey = legacy;
+  const legacyKeyHex = await legacyUnwrap(secret);
+  if (!legacyKeyHex) return false;
+  const keyBytes = hexToBytes(legacyKeyHex);
+  const info = await getUnlockInfo();
+  // Write the new slot before removing anything old: if the app dies in
+  // between, the new slot simply wins next time.
+  await writeSlot(await buildSlot(keyBytes, secret, 'pin', info.pinLength ?? 4));
+  await deleteLegacyKeys();
+  await openSession(keyBytes);
+  wipeBytes(keyBytes);
   return true;
 }
 
-/**
- * Re-wrap the current session key under a new PIN (used by Change PIN).
- * Requires an open session.
- */
-export async function rewrapForNewPin(newPin: string): Promise<void> {
-  const key = getSessionKey();
-  await wrapAndStore(key, newPin);
-}
-
-// ---- Biometric convenience slot ----
-
-export async function enableBiometricKey(): Promise<void> {
-  const key = getSessionKey();
-  await SecureStore.setItemAsync(BIOMETRIC_KEY, key);
-}
-
-export async function disableBiometricKey(): Promise<void> {
-  await SecureStore.deleteItemAsync(BIOMETRIC_KEY).catch(() => {});
+/** Check a PIN/passphrase without changing the session (re-auth prompts). */
+export async function verifySecret(secret: string): Promise<boolean> {
+  const slot = await readSlot();
+  if (slot) {
+    const key = await unwrapSlot(slot, secret);
+    wipeBytes(key);
+    return key !== null;
+  }
+  return (await legacyUnwrap(secret)) !== null;
 }
 
 /**
- * Open the session from the biometric slot. The caller must have already passed
- * the OS biometric prompt. Returns false if no biometric key is provisioned.
+ * Re-protect the open vault with a new PIN or passphrase. One SecureStore
+ * write replaces the old slot, so there is no half-changed state.
  */
-export async function unlockWithBiometricKey(): Promise<boolean> {
-  const key = await SecureStore.getItemAsync(BIOMETRIC_KEY);
-  if (!key) return false;
-  sessionKey = key;
-  return true;
+export async function changeSecret(newSecret: string, method: UnlockMethod, pinLength: 4 | 6 | null): Promise<void> {
+  const keyBytes = hexToBytes(getSession().keyHex);
+  try {
+    await writeSlot(await buildSlot(keyBytes, newSecret, method, pinLength));
+  } finally {
+    wipeBytes(keyBytes);
+  }
+}
+
+// ---- Fingerprint unlock ----
+
+export async function isBiometricUnlockEnabled(): Promise<boolean> {
+  return (await SecureStore.getItemAsync(BIO_FLAG)) === '1';
+}
+
+/** Store the key behind a biometric check. Shows the system fingerprint prompt. */
+export async function enableBiometricUnlock(): Promise<void> {
+  const { keyHex } = getSession();
+  await SecureStore.setItemAsync(BIO_KEY, keyHex, {
+    requireAuthentication: true,
+    authenticationPrompt: 'Confirm your fingerprint to turn on fingerprint unlock',
+  });
+  await SecureStore.setItemAsync(BIO_FLAG, '1');
+  await SecureStore.deleteItemAsync(BIO_REOFFER).catch(() => {});
+}
+
+export async function disableBiometricUnlock(): Promise<void> {
+  await Promise.all([
+    SecureStore.deleteItemAsync(BIO_KEY).catch(() => {}),
+    SecureStore.deleteItemAsync(BIO_FLAG).catch(() => {}),
+  ]);
+}
+
+export type BiometricUnlockResult = 'ok' | 'cancelled' | 'invalidated';
+
+/**
+ * Ask Android to release the key with a fingerprint. 'invalidated' means the
+ * keystore dropped the key (for example after a new fingerprint was enrolled),
+ * so fingerprint unlock is switched off and the PIN is needed.
+ */
+export async function unlockWithBiometrics(): Promise<BiometricUnlockResult> {
+  const slot = await readSlot();
+  let keyHex: string | null;
+  try {
+    keyHex = await SecureStore.getItemAsync(BIO_KEY, {
+      requireAuthentication: true,
+      authenticationPrompt: 'Unlock Passcard Store',
+    });
+  } catch {
+    return 'cancelled';
+  }
+  if (!keyHex || !/^[0-9a-f]{64}$/i.test(keyHex) || !slot) {
+    await disableBiometricUnlock();
+    return 'invalidated';
+  }
+  const keyBytes = hexToBytes(keyHex);
+  try {
+    await open(await importAeadKey(keyBytes), slot.check, CHECK_AAD);
+  } catch {
+    await disableBiometricUnlock();
+    return 'invalidated';
+  }
+  await openSession(keyBytes);
+  wipeBytes(keyBytes);
+  return 'ok';
+}
+
+/**
+ * v1.0–v1.1 kept a plain copy of the key for fingerprint unlock and enabled it
+ * by default. Remove that copy at boot; if the user had fingerprint unlock on,
+ * remember to offer re-enrolling it (behind the keystore) after their next
+ * PIN unlock.
+ */
+export async function migrateLegacyBiometrics(wasEnabled: boolean): Promise<void> {
+  const legacyCopy = await SecureStore.getItemAsync(LEGACY.biometric).catch(() => null);
+  if (legacyCopy === null) return;
+  await SecureStore.deleteItemAsync(LEGACY.biometric).catch(() => {});
+  if (wasEnabled) await SecureStore.setItemAsync(BIO_REOFFER, '1');
+}
+
+export async function shouldReofferBiometrics(): Promise<boolean> {
+  return (await SecureStore.getItemAsync(BIO_REOFFER)) === '1';
+}
+
+export async function dismissBiometricReoffer(): Promise<void> {
+  await SecureStore.deleteItemAsync(BIO_REOFFER).catch(() => {});
 }
 
 // ---- Wipe ----
 
 export async function wipeKeys(): Promise<void> {
-  sessionKey = null;
-  await Promise.all([
-    SecureStore.deleteItemAsync(WRAPPED_KEY).catch(() => {}),
-    SecureStore.deleteItemAsync(WRAP_SALT).catch(() => {}),
-    SecureStore.deleteItemAsync(WRAP_ITERS).catch(() => {}),
-    SecureStore.deleteItemAsync(BIOMETRIC_KEY).catch(() => {}),
-    SecureStore.deleteItemAsync(LEGACY_KEY).catch(() => {}),
-  ]);
+  session = null;
+  await Promise.all(
+    [SLOT_KEY, BIO_KEY, BIO_FLAG, BIO_REOFFER, ...Object.values(LEGACY)].map((k) =>
+      SecureStore.deleteItemAsync(k).catch(() => {}),
+    ),
+  );
 }

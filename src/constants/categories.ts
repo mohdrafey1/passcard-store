@@ -1,17 +1,8 @@
-import type { PasswordCategory } from '@/types/password';
+import { DEFAULT_CATEGORIES } from '@/types/settings';
 
-export const DEFAULT_CATEGORIES: PasswordCategory[] = [
-  'Social',
-  'Banking',
-  'Work',
-  'Personal',
-  'Shopping',
-  'Entertainment',
-  'Education',
-  'Other',
-];
+export { DEFAULT_CATEGORIES };
 
-export const CATEGORY_ICONS: Record<PasswordCategory, string> = {
+const CATEGORY_ICONS: Record<string, string> = {
   Social: '👥',
   Banking: '🏦',
   Work: '💼',
@@ -21,3 +12,7 @@ export const CATEGORY_ICONS: Record<PasswordCategory, string> = {
   Education: '📚',
   Other: '📌',
 };
+
+export function categoryIcon(category: string): string {
+  return CATEGORY_ICONS[category] ?? '📌';
+}

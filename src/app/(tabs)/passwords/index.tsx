@@ -12,27 +12,21 @@ import { usePasswordStore } from '@/features/passwords/store';
 import { copyToClipboard } from '@/utils/clipboard';
 import { showToast } from '@/utils/toast';
 import { sharePassword } from '@/utils/share';
-import { CATEGORY_ICONS, DEFAULT_CATEGORIES } from '@/constants/categories';
+import { categoryIcon } from '@/constants/categories';
 import { useSettingsStore } from '@/features/settings/store';
-import type { PasswordEntry, PasswordCategory } from '@/types/password';
+import type { PasswordEntry } from '@/types/password';
 import { useDebounce } from '@/hooks/useDebounce';
 
 export default function PasswordListScreen() {
   const params = useLocalSearchParams<{ search?: string }>();
-  const { passwords, loading, load, remove, duplicate, search, selectedCategory, setCategory } = usePasswordStore();
+  const { passwords, loaded, remove, duplicate } = usePasswordStore();
+  const loading = !loaded;
+  const userCategories = useSettingsStore((s) => s.categories);
+  const [selectedCategory, setCategory] = useState<string>('All');
   const clipboardDuration = useSettingsStore((s) => s.clipboardClearDuration);
   const [searchQuery, setSearchQuery] = useState(params.search || '');
   const [actionItem, setActionItem] = useState<PasswordEntry | null>(null);
   const debouncedSearch = useDebounce(searchQuery, 300);
-
-  useEffect(() => {
-    if (debouncedSearch) {
-      search(debouncedSearch);
-    } else {
-      load();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch]);
 
   // Keep the field in sync when arriving from the dashboard with a new query
   // (params.search changes on each navigation).
@@ -40,23 +34,17 @@ export default function PasswordListScreen() {
     if (params.search !== undefined) setSearchQuery(params.search);
   }, [params.search]);
 
-  // Reload from the database whenever the screen regains focus (e.g. after
-  // adding, editing or deleting an entry on another screen). The list screen
-  // stays mounted-but-frozen while a child screen is open, so store updates
-  // made there don't always re-render it until we explicitly refresh here.
-  useFocusEffect(
-    useCallback(() => {
-      if (!debouncedSearch) load();
-    }, [debouncedSearch]),
-  );
-
   // Text search is already applied by the store (search results live in
   // `passwords`); here we only layer on the category filter. Computing it with
   // useMemo avoids the fragile "call the selector" pattern.
   const filtered = useMemo(() => {
-    if (selectedCategory === 'All') return passwords;
-    return passwords.filter((p) => p.category === selectedCategory);
-  }, [passwords, selectedCategory]);
+    const q = debouncedSearch.trim().toLowerCase();
+    return passwords.filter(
+      (p) =>
+        (selectedCategory === 'All' || p.category === selectedCategory) &&
+        (!q || [p.title, p.website, p.username, p.email].some((f) => f.toLowerCase().includes(q))),
+    );
+  }, [passwords, selectedCategory, debouncedSearch]);
 
   const confirmDelete = useCallback((item: PasswordEntry) => {
     Alert.alert('Delete Password', `Delete "${item.title}"? This cannot be undone.`, [
@@ -84,14 +72,14 @@ export default function PasswordListScreen() {
     <VaultCard
       title={item.title}
       subtitle={item.website || item.email}
-      leftIcon={<Text style={{ fontSize: 18 }}>{CATEGORY_ICONS[item.category] || '🔒'}</Text>}
+      leftIcon={<Text style={{ fontSize: 18 }}>{categoryIcon(item.category)}</Text>}
       rightText={item.category}
       onPress={() => router.push(`/(tabs)/passwords/${item.id}`)}
       onLongPress={() => setActionItem(item)}
     />
   );
 
-  const categories = ['All', ...DEFAULT_CATEGORIES] as const;
+  const categories = ['All', ...userCategories];
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -121,7 +109,7 @@ export default function PasswordListScreen() {
         renderItem={({ item: cat }) => (
           <TouchableOpacity
             style={[styles.categoryPill, selectedCategory === cat && styles.categoryPillActive]}
-            onPress={() => setCategory(cat as PasswordCategory | 'All')}
+            onPress={() => setCategory(cat)}
             accessibilityRole="button"
             accessibilityState={{ selected: selectedCategory === cat }}
             accessibilityLabel={`Filter by ${cat}`}

@@ -6,7 +6,7 @@ import type { CardEntry } from '@/types/card';
 import { passwordRepository } from '@/storage/password-repository';
 import { cardRepository } from '@/storage/card-repository';
 import { cleanupTempFile } from '@/utils/cache';
-import { runWithoutAutoLock } from '@/hooks/useAutoLock';
+import { runWithoutAutoLock } from '@/utils/auto-lock-guard';
 import { DEFAULT_CATEGORIES } from '@/constants/categories';
 import * as ExpoCrypto from 'expo-crypto';
 
@@ -34,7 +34,8 @@ export function exportPasswordsToCSV(passwords: PasswordEntry[]): string {
     notes: p.notes,
     category: p.category,
   }));
-  return Papa.unparse(data);
+  // escapeFormulae: a value like =HYPERLINK(...) must stay text in a spreadsheet.
+  return Papa.unparse(data, { escapeFormulae: true });
 }
 
 /**
@@ -50,7 +51,7 @@ export function exportCardsToCSV(cards: CardEntry[]): string {
     cvv: c.cvv,
     notes: c.notes,
   }));
-  return Papa.unparse(data);
+  return Papa.unparse(data, { escapeFormulae: true });
 }
 
 /**
@@ -153,6 +154,9 @@ export async function importPasswordsFromCSV(csvContent: string): Promise<Import
         password,
         notes: (row.notes || '').trim(),
         category,
+        favorite: false,
+        lastUsedAt: null,
+        passwordChangedAt: now,
         createdAt: now,
         updatedAt: now,
       });
@@ -165,7 +169,7 @@ export async function importPasswordsFromCSV(csvContent: string): Promise<Import
   }
 
   if (toImport.length > 0) {
-    await passwordRepository.bulkCreate(toImport);
+    await passwordRepository.upsertMany(toImport);
     result.imported = toImport.length;
   }
 
@@ -228,6 +232,9 @@ export async function importCardsFromCSV(csvContent: string): Promise<ImportResu
         cvv: (row.cvv || '').trim(),
         cardNickname: (row.cardNickname || '').trim(),
         notes: (row.notes || '').trim(),
+        color: 'navy',
+        favorite: false,
+        lastUsedAt: null,
         createdAt: now,
         updatedAt: now,
       });
@@ -240,7 +247,7 @@ export async function importCardsFromCSV(csvContent: string): Promise<ImportResu
   }
 
   if (toImport.length > 0) {
-    await cardRepository.bulkCreate(toImport);
+    await cardRepository.upsertMany(toImport);
     result.imported = toImport.length;
   }
 

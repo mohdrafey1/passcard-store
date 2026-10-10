@@ -6,11 +6,8 @@ import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { Colors, FontSize, Spacing, BorderRadius } from '@/constants/theme';
 import { useSettingsStore } from '@/features/settings/store';
-import { isBiometricAvailable, getBiometricType } from '@/security/biometrics';
-import { verifyStoredPin, getPinLength, deletePin } from '@/security/pin';
-import { deleteDatabase } from '@/storage/database';
-import { wipeKeys } from '@/security/key-manager';
-import { deleteAllSettings } from '@/storage/settings-storage';
+import { getBiometricLabel } from '@/security/biometrics';
+import { eraseVault, lockVault } from '@/features/session/session';
 import ActionSheet, { type SheetAction } from '@/components/ActionSheet';
 import PinModal from '@/components/PinModal';
 import { AUTO_LOCK_OPTIONS, CLIPBOARD_CLEAR_OPTIONS } from '@/types/settings';
@@ -59,28 +56,22 @@ function SettingToggle({ icon, label, value, onToggle }: {
 export default function SettingsScreen() {
   const settings = useSettingsStore();
   const [biometricType, setBiometricType] = useState('Biometric');
-  const [pinLength, setPinLength] = useState<4 | 6>(4);
   const [picker, setPicker] = useState<'autolock' | 'clipboard' | null>(null);
   const [deleteAuthVisible, setDeleteAuthVisible] = useState(false);
-  const [pinError, setPinError] = useState('');
 
   useEffect(() => {
-    getBiometricType().then(setBiometricType);
-    getPinLength().then(setPinLength);
+    getBiometricLabel().then(setBiometricType);
   }, []);
 
   const handleBiometricsToggle = async (enabled: boolean) => {
-    if (enabled) {
-      const available = await isBiometricAvailable();
-      if (!available) {
-        Alert.alert('Not Available', 'Biometric authentication is not set up on this device.');
-        return;
-      }
+    if (enabled && !settings.biometricsAvailable) {
+      Alert.alert('Not available', 'Add a fingerprint in your phone\u2019s settings first.');
+      return;
     }
     try {
       await settings.setBiometrics(enabled);
     } catch {
-      Alert.alert('Error', 'Could not update biometric setting.');
+      // Cancelled at the system prompt; nothing changed.
     }
   };
 
@@ -88,23 +79,19 @@ export default function SettingsScreen() {
   const autoLockActions: SheetAction[] = AUTO_LOCK_OPTIONS.map((opt) => ({
     label: opt.label,
     icon: settings.autoLockDuration === opt.value ? 'checkmark-circle' : 'ellipse-outline',
-    onPress: () => settings.setAutoLockDuration(opt.value),
+    onPress: () => settings.update('autoLockDuration', opt.value),
   }));
 
   const clipboardActions: SheetAction[] = CLIPBOARD_CLEAR_OPTIONS.map((opt) => ({
     label: opt.label,
     icon: settings.clipboardClearDuration === opt.value ? 'checkmark-circle' : 'ellipse-outline',
-    onPress: () => settings.setClipboardClearDuration(opt.value),
+    onPress: () => settings.update('clipboardClearDuration', opt.value),
   }));
 
   // ---- Delete all (requires PIN re-authentication) ----
   const performWipe = async () => {
     try {
-      await deleteDatabase();
-      await wipeKeys();
-      await deletePin();
-      await deleteAllSettings();
-      await settings.resetAll();
+      await eraseVault();
       router.replace('/');
     } catch {
       Alert.alert('Error', 'Failed to delete data');
@@ -121,7 +108,6 @@ export default function SettingsScreen() {
           text: 'Continue',
           style: 'destructive',
           onPress: () => {
-            setPinError('');
             setDeleteAuthVisible(true);
           },
         },
@@ -129,12 +115,7 @@ export default function SettingsScreen() {
     );
   };
 
-  const handleDeleteAuth = async (pin: string) => {
-    const ok = await verifyStoredPin(pin);
-    if (!ok) {
-      setPinError('Incorrect PIN.');
-      return;
-    }
+  const handleDeleteAuth = async () => {
     setDeleteAuthVisible(false);
     await performWipe();
   };
@@ -153,13 +134,15 @@ export default function SettingsScreen() {
           <SettingToggle icon="finger-print" label={`${biometricType} Unlock`} value={settings.biometricsEnabled} onToggle={handleBiometricsToggle} />
           <SettingRow icon="time-outline" label="Auto Lock" value={autoLockLabel} onPress={() => setPicker('autolock')} />
           <SettingRow icon="clipboard-outline" label="Clipboard Clear" value={clipboardLabel} onPress={() => setPicker('clipboard')} />
+          <SettingToggle icon="warning-outline" label="Erase after 10 wrong PINs" value={settings.wipeAfterFailures} onToggle={(v) => settings.update('wipeAfterFailures', v)} />
+          <SettingRow icon="lock-closed-outline" label="Lock now" onPress={lockVault} />
         </View>
 
         <Text style={styles.sectionTitle}>Data</Text>
         <View style={styles.section}>
           <SettingRow icon="download-outline" label="Import Data" onPress={() => router.push('/(tabs)/settings/import')} />
           <SettingRow icon="share-outline" label="Export Data" onPress={() => router.push('/(tabs)/settings/export')} />
-          <SettingRow icon="archive-outline" label="Create Backup" onPress={() => router.push('/(tabs)/settings/backup')} />
+          <SettingRow icon="archive-outline" label="Backup & Restore" onPress={() => router.push('/(tabs)/settings/backup')} />
         </View>
 
         <Text style={styles.sectionTitle}>Danger Zone</Text>
@@ -187,11 +170,9 @@ export default function SettingsScreen() {
 
       <PinModal
         visible={deleteAuthVisible}
-        pinLength={pinLength}
-        title="Confirm Your PIN"
-        subtitle="Enter your PIN to delete all data"
-        error={pinError}
-        onComplete={handleDeleteAuth}
+        title="Confirm it's you"
+        subtitle="Enter your PIN to erase the vault"
+        onVerified={handleDeleteAuth}
         onClose={() => setDeleteAuthVisible(false)}
       />
     </SafeAreaView>

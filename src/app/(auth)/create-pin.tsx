@@ -3,22 +3,21 @@ import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import PinPad from '@/components/PinPad';
-import { createPin } from '@/security/pin';
-import { provisionKeyForNewPin, enableBiometricKey } from '@/security/key-manager';
-import { isBiometricAvailable } from '@/security/biometrics';
-import { saveSetting } from '@/storage/settings-storage';
+import { Alert } from 'react-native';
+import { createVault, enableBiometricUnlock } from '@/security/key-manager';
+import { weakPinReason } from '@/security/pin-rules';
 import { useSettingsStore } from '@/features/settings/store';
+import { completeUnlock } from '@/features/session/session';
 import { Colors, FontSize, Spacing, BorderRadius } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function CreatePinScreen() {
   const [step, setStep] = useState<'select' | 'create' | 'confirm'>('select');
-  const [pinLength, setPinLength] = useState<4 | 6>(4);
+  const [pinLength, setPinLength] = useState<4 | 6>(6);
   const [firstPin, setFirstPin] = useState('');
   const [error, setError] = useState('');
   const [creating, setCreating] = useState(false);
-  const initialize = useSettingsStore((s) => s.initialize);
-  const setAuthenticated = useSettingsStore((s) => s.setAuthenticated);
+  const refreshSecurity = useSettingsStore((s) => s.refreshSecurity);
 
   const handleSelectLength = (length: 4 | 6) => {
     setPinLength(length);
@@ -26,6 +25,11 @@ export default function CreatePinScreen() {
   };
 
   const handleCreatePin = (pin: string) => {
+    const weak = weakPinReason(pin);
+    if (weak) {
+      setError(`${weak} Choose another PIN.`);
+      return;
+    }
     setFirstPin(pin);
     setError('');
     setStep('confirm');
@@ -41,24 +45,18 @@ export default function CreatePinScreen() {
 
     setCreating(true);
     try {
-      await createPin(pin);
-      // Provision the data key wrapped under this PIN and open the session, so
-      // the user goes straight into the app instead of re-entering the PIN.
-      await provisionKeyForNewPin(pin);
-      // Biometric unlock is ON by default. If the device has fingerprint/face
-      // set up, provision the biometric key slot now so it works from the very
-      // first lock. If not available, the setting stays on but simply falls
-      // back to the PIN until the user enrolls a biometric.
-      try {
-        if (await isBiometricAvailable()) {
-          await enableBiometricKey();
-          await saveSetting('biometricsEnabled', true);
-        }
-      } catch {
-        // Non-fatal — the user can still unlock with their PIN.
+      await createVault(pin, 'pin', pinLength);
+      await refreshSecurity();
+      if (useSettingsStore.getState().biometricsAvailable) {
+        await new Promise<void>((resolve) =>
+          Alert.alert('Unlock with fingerprint?', 'Your vault key is kept in Android\u2019s secure hardware and released only after a fingerprint match.', [
+            { text: 'Not now', style: 'cancel', onPress: () => resolve() },
+            { text: 'Turn on', onPress: () => enableBiometricUnlock().catch(() => {}).finally(resolve) },
+          ]),
+        );
+        await refreshSecurity();
       }
-      await initialize();
-      setAuthenticated(true);
+      await completeUnlock();
       router.replace('/(tabs)');
     } catch (e) {
       setError('Failed to create PIN. Please try again.');

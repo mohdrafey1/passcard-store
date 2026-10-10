@@ -1,83 +1,96 @@
 import { create } from 'zustand';
-import type { AppSettings, AutoLockDuration, ClipboardClearDuration } from '@/types/settings';
-import { DEFAULT_SETTINGS } from '@/types/settings';
-import { loadSettings, saveSetting, deleteAllSettings } from '@/storage/settings-storage';
-import { isPinSetup } from '@/security/pin';
-import { enableBiometricKey, disableBiometricKey } from '@/security/key-manager';
+import { DEFAULT_SETTINGS, type AppSettings } from '@/types/settings';
+import { loadSettings, saveSetting, takeLegacyBiometricPreference } from '@/storage/settings-storage';
+import {
+  disableBiometricUnlock,
+  enableBiometricUnlock,
+  getUnlockInfo,
+  hasVault,
+  isBiometricUnlockEnabled,
+  migrateLegacyBiometrics,
+  type UnlockMethod,
+} from '@/security/key-manager';
+import { isBiometricAvailable } from '@/security/biometrics';
 
-interface AuthState {
-  isAuthenticated: boolean;
-  isPinCreated: boolean;
+interface SecurityState {
   isInitialized: boolean;
+  hasVault: boolean;
+  isAuthenticated: boolean;
+  unlockMethod: UnlockMethod;
+  /** Digits for a PIN vault; null for a passphrase. */
+  pinLength: 4 | 6 | null;
+  biometricsEnabled: boolean;
+  biometricsAvailable: boolean;
 }
 
-interface SettingsState extends AppSettings, AuthState {
-  // Auth actions
+interface SettingsState extends AppSettings, SecurityState {
   initialize: () => Promise<void>;
+  /** Re-read unlock method and fingerprint state after they change. */
+  refreshSecurity: () => Promise<void>;
   setAuthenticated: (value: boolean) => void;
-  // Settings actions
-  loadSettings: () => Promise<void>;
+  setHasVault: (value: boolean) => void;
+  update: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => Promise<void>;
+  /** Turning on shows the system fingerprint prompt and throws if cancelled. */
   setBiometrics: (enabled: boolean) => Promise<void>;
-  setAutoLockDuration: (duration: AutoLockDuration) => Promise<void>;
-  setClipboardClearDuration: (duration: ClipboardClearDuration) => Promise<void>;
-  resetAll: () => Promise<void>;
+  resetToDefaults: () => void;
 }
 
-export const useSettingsStore = create<SettingsState>((set) => ({
-  // Default settings
-  ...DEFAULT_SETTINGS,
-  // Auth state
-  isAuthenticated: false,
-  isPinCreated: false,
+const INITIAL_SECURITY: SecurityState = {
   isInitialized: false,
+  hasVault: false,
+  isAuthenticated: false,
+  unlockMethod: 'pin',
+  pinLength: 6,
+  biometricsEnabled: false,
+  biometricsAvailable: false,
+};
+
+export const useSettingsStore = create<SettingsState>((set, get) => ({
+  ...DEFAULT_SETTINGS,
+  ...INITIAL_SECURITY,
 
   initialize: async () => {
-    const pinCreated = await isPinSetup();
-    const settings = await loadSettings();
+    const legacyPreference = await takeLegacyBiometricPreference();
+    await migrateLegacyBiometrics(legacyPreference ?? true);
+    const [vault, settings] = await Promise.all([hasVault(), loadSettings()]);
+    set({ ...settings, hasVault: vault });
+    await get().refreshSecurity();
+    set({ isInitialized: true });
+  },
+
+  refreshSecurity: async () => {
+    const vault = await hasVault();
+    const [info, bioEnabled, bioAvailable] = await Promise.all([
+      vault ? getUnlockInfo() : Promise.resolve({ method: 'pin' as const, pinLength: 6 as const }),
+      isBiometricUnlockEnabled(),
+      isBiometricAvailable(),
+    ]);
     set({
-      isPinCreated: pinCreated,
-      isInitialized: true,
-      ...settings,
+      hasVault: vault,
+      unlockMethod: info.method,
+      pinLength: info.pinLength,
+      biometricsEnabled: bioEnabled && bioAvailable,
+      biometricsAvailable: bioAvailable,
     });
   },
 
-  setAuthenticated: (value: boolean) => {
-    set({ isAuthenticated: value });
+  setAuthenticated: (value) => set({ isAuthenticated: value }),
+
+  setHasVault: (value) => set({ hasVault: value }),
+
+  update: async (key, value) => {
+    await saveSetting(key, value);
+    set({ [key]: value } as Partial<SettingsState>);
   },
 
-  loadSettings: async () => {
-    const settings = await loadSettings();
-    set(settings);
-  },
-
-  setBiometrics: async (enabled: boolean) => {
-    // Provision (or remove) the biometric-accessible copy of the data key so
-    // biometric unlock can recover it without the PIN.
+  setBiometrics: async (enabled) => {
     if (enabled) {
-      await enableBiometricKey();
+      await enableBiometricUnlock();
     } else {
-      await disableBiometricKey();
+      await disableBiometricUnlock();
     }
-    await saveSetting('biometricsEnabled', enabled);
     set({ biometricsEnabled: enabled });
   },
 
-  setAutoLockDuration: async (duration: AutoLockDuration) => {
-    await saveSetting('autoLockDuration', duration);
-    set({ autoLockDuration: duration });
-  },
-
-  setClipboardClearDuration: async (duration: ClipboardClearDuration) => {
-    await saveSetting('clipboardClearDuration', duration);
-    set({ clipboardClearDuration: duration });
-  },
-
-  resetAll: async () => {
-    await deleteAllSettings();
-    set({
-      ...DEFAULT_SETTINGS,
-      isAuthenticated: false,
-      isPinCreated: false,
-    });
-  },
+  resetToDefaults: () => set({ ...DEFAULT_SETTINGS, ...INITIAL_SECURITY, isInitialized: true }),
 }));

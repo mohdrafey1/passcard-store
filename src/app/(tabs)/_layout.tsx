@@ -8,7 +8,7 @@ import { useSettingsStore } from '@/features/settings/store';
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const isAuthenticated = useSettingsStore((s) => s.isAuthenticated);
-  const isPinCreated = useSettingsStore((s) => s.isPinCreated);
+  const isPinCreated = useSettingsStore((s) => s.hasVault);
 
   // When the vault locks (auto-lock, manual, etc.) the authenticated flag flips
   // to false — but nothing navigates away from the tabs on its own. Redirect to

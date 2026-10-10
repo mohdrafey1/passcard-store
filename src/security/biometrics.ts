@@ -1,55 +1,31 @@
 import * as LocalAuthentication from 'expo-local-authentication';
+import * as SecureStore from 'expo-secure-store';
 
 /**
- * Check if biometric hardware is available
+ * Whether fingerprint unlock can work here: a strong (class 3) biometric is
+ * enrolled, which is what the keystore needs to protect the vault key.
  */
 export async function isBiometricAvailable(): Promise<boolean> {
-  const hasHardware = await LocalAuthentication.hasHardwareAsync();
-  const isEnrolled = await LocalAuthentication.isEnrolledAsync();
-  return hasHardware && isEnrolled;
+  try {
+    const [hasHardware, isEnrolled] = await Promise.all([
+      LocalAuthentication.hasHardwareAsync(),
+      LocalAuthentication.isEnrolledAsync(),
+    ]);
+    return hasHardware && isEnrolled && SecureStore.canUseBiometricAuthentication();
+  } catch {
+    return false;
+  }
 }
 
-/**
- * Get the type of biometric authentication available
- */
-export async function getBiometricType(): Promise<string> {
-  const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
-  if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
-    return 'Face ID';
-  }
-  if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
-    return 'Fingerprint';
-  }
-  if (types.includes(LocalAuthentication.AuthenticationType.IRIS)) {
-    return 'Iris';
+/** "Fingerprint", "Face" or "Biometric", for labels. */
+export async function getBiometricLabel(): Promise<string> {
+  try {
+    const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
+    if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) return 'Fingerprint';
+    if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) return 'Face';
+    if (types.includes(LocalAuthentication.AuthenticationType.IRIS)) return 'Iris';
+  } catch {
+    // fall through
   }
   return 'Biometric';
-}
-
-export interface BiometricResult {
-  success: boolean;
-  /** Present on failure: e.g. 'user_cancel', 'authentication_failed', 'lockout'. */
-  error?: string;
-}
-
-/**
- * Authenticate user using biometrics.
- * Returns success plus, on failure, the underlying reason so the caller can
- * distinguish a genuine mismatch (which should count toward lockout) from a
- * user cancel (which should not).
- */
-export async function authenticateWithBiometrics(
-  promptMessage = 'Unlock Passcard Store',
-): Promise<BiometricResult> {
-  try {
-    const result = await LocalAuthentication.authenticateAsync({
-      promptMessage,
-      cancelLabel: 'Use PIN',
-      disableDeviceFallback: true,
-    });
-    if (result.success) return { success: true };
-    return { success: false, error: (result as { error?: string }).error };
-  } catch {
-    return { success: false, error: 'unknown' };
-  }
 }

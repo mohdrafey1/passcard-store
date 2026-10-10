@@ -37,6 +37,9 @@ export default function AddCardScreen() {
         cvv,
         cardNickname: cardNickname || 'Card',
         notes: notes || '',
+        color: 'navy',
+        favorite: false,
+        lastUsedAt: null,
       });
       router.back();
     } catch (e: any) {

@@ -1,5 +1,8 @@
 import * as SQLite from 'expo-sqlite';
 
+const DB_NAME = 'passcard_vault.db';
+const SCHEMA_VERSION = 2;
+
 let db: SQLite.SQLiteDatabase | null = null;
 let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
@@ -9,14 +12,11 @@ let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
  */
 export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
   if (db) return db;
-
-  // If init is already in progress, wait for it
   if (dbPromise) return dbPromise;
 
-  // Start init and store the promise so concurrent callers wait on it
   dbPromise = (async () => {
-    const database = await SQLite.openDatabaseAsync('passcard_vault.db');
-    await initializeSchema(database);
+    const database = await SQLite.openDatabaseAsync(DB_NAME);
+    await migrate(database);
     db = database;
     return database;
   })();
@@ -24,20 +24,32 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
   try {
     return await dbPromise;
   } catch (error) {
-    // Reset on failure so next call retries
     dbPromise = null;
     throw error;
   }
 }
 
+async function hasColumn(database: SQLite.SQLiteDatabase, table: string, column: string): Promise<boolean> {
+  const cols = await database.getAllAsync<{ name: string }>(`PRAGMA table_info(${table})`);
+  return cols.some((c) => c.name === column);
+}
+
 /**
- * Initialize the database schema
+ * Schema history (tracked in PRAGMA user_version):
+ *  1 — v1.0–v1.1 tables, with plaintext search columns.
+ *  2 — v1.3: `deleted_at` for Recently deleted; search columns are no longer
+ *      written (search runs in memory on decrypted data) and their indexes go.
  */
-async function initializeSchema(database: SQLite.SQLiteDatabase): Promise<void> {
-  // Execute PRAGMAs separately — some drivers don't support multi-statement PRAGMAs
+async function migrate(database: SQLite.SQLiteDatabase): Promise<void> {
   await database.execAsync('PRAGMA journal_mode = WAL;');
   await database.execAsync('PRAGMA foreign_keys = ON;');
 
+  const row = await database.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
+  const version = row?.user_version ?? 0;
+  if (version >= SCHEMA_VERSION) return;
+
+  // The legacy column set is kept so existing installs and new ones share
+  // one shape; the search_* columns simply stay empty from v2 on.
   await database.execAsync(`
     CREATE TABLE IF NOT EXISTS passwords (
       id TEXT PRIMARY KEY NOT NULL,
@@ -46,13 +58,10 @@ async function initializeSchema(database: SQLite.SQLiteDatabase): Promise<void> 
       search_website TEXT DEFAULT '',
       search_email TEXT DEFAULT '',
       search_username TEXT DEFAULT '',
-      category TEXT DEFAULT 'Other',
+      category TEXT DEFAULT '',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
-  `);
-
-  await database.execAsync(`
     CREATE TABLE IF NOT EXISTS cards (
       id TEXT PRIMARY KEY NOT NULL,
       encrypted_data TEXT NOT NULL,
@@ -64,24 +73,23 @@ async function initializeSchema(database: SQLite.SQLiteDatabase): Promise<void> 
     );
   `);
 
+  for (const table of ['passwords', 'cards']) {
+    if (!(await hasColumn(database, table, 'deleted_at'))) {
+      await database.execAsync(`ALTER TABLE ${table} ADD COLUMN deleted_at TEXT DEFAULT NULL;`);
+    }
+  }
+
   await database.execAsync(`
-    CREATE INDEX IF NOT EXISTS idx_passwords_category ON passwords(category);
-    CREATE INDEX IF NOT EXISTS idx_passwords_search ON passwords(search_title, search_website, search_email);
-    CREATE INDEX IF NOT EXISTS idx_cards_search ON cards(search_nickname, search_last_four);
+    DROP INDEX IF EXISTS idx_passwords_category;
+    DROP INDEX IF EXISTS idx_passwords_search;
+    DROP INDEX IF EXISTS idx_cards_search;
     CREATE INDEX IF NOT EXISTS idx_passwords_updated ON passwords(updated_at DESC);
     CREATE INDEX IF NOT EXISTS idx_cards_updated ON cards(updated_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_passwords_deleted ON passwords(deleted_at);
+    CREATE INDEX IF NOT EXISTS idx_cards_deleted ON cards(deleted_at);
   `);
-}
 
-/**
- * Close the database connection
- */
-export async function closeDatabase(): Promise<void> {
-  if (db) {
-    await db.closeAsync();
-    db = null;
-    dbPromise = null;
-  }
+  await database.execAsync(`PRAGMA user_version = ${SCHEMA_VERSION};`);
 }
 
 /**
@@ -93,5 +101,5 @@ export async function deleteDatabase(): Promise<void> {
     db = null;
     dbPromise = null;
   }
-  await SQLite.deleteDatabaseAsync('passcard_vault.db');
+  await SQLite.deleteDatabaseAsync(DB_NAME);
 }

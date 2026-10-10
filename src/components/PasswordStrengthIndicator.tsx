@@ -1,7 +1,22 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
-import { calculatePasswordStrength, getStrengthLabel } from '@/utils/password-generator';
+
+function calculatePasswordStrength(password: string): number {
+  if (!password) return 0;
+  let score = 0;
+  if (password.length >= 8) score++;
+  if (password.length >= 12) score++;
+  if (password.length >= 16) score++;
+  const variety = [/[a-z]/, /[A-Z]/, /[0-9]/, /[^a-zA-Z0-9]/].filter((r) => r.test(password)).length;
+  if (variety >= 3) score++;
+  if (variety >= 4) score++;
+  return Math.min(4, score);
+}
+
+function getStrengthLabel(score: number): string {
+  return ['Very Weak', 'Weak', 'Fair', 'Good', 'Strong'][score] ?? 'Unknown';
+}
 
 interface Props {
   password: string;

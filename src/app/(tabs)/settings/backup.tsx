@@ -1,214 +1,241 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, TextInput } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, FontSize, Spacing, BorderRadius } from '@/constants/theme';
-import { createBackup, shareBackup, restoreBackup } from '@/features/import-export/backup-handler';
-import { usePasswordStore } from '@/features/passwords/store';
+import { BorderRadius, Colors, FontSize, Spacing } from '@/constants/theme';
+import {
+  applyBackup,
+  backupCategories,
+  buildBackup,
+  decryptBackup,
+  detectBackupKind,
+  hasBackupPassword,
+  MIN_BACKUP_PASSWORD_LENGTH,
+  readBackupFile,
+  saveBackupToFolder,
+  setBackupPassword,
+  shareBackup,
+  type BackupPayload,
+} from '@/features/import-export/backup-handler';
 import { useCardStore } from '@/features/cards/store';
+import { usePasswordStore } from '@/features/passwords/store';
 import { useSettingsStore } from '@/features/settings/store';
-import { verifyStoredPin, getPinLength } from '@/security/pin';
-import { cleanupTempFile } from '@/utils/cache';
-import { runWithoutAutoLock } from '@/hooks/useAutoLock';
+import { runWithoutAutoLock } from '@/utils/auto-lock-guard';
 import PinModal from '@/components/PinModal';
 
+type Mode = 'menu' | 'set-password' | 'restore-secret';
+
 export default function BackupScreen() {
-  const [loading, setLoading] = useState(false);
-  const [mode, setMode] = useState<'menu' | 'restore-pin'>('menu');
-  const [restoreUri, setRestoreUri] = useState('');
-  const [pin, setPin] = useState('');
-  const [pinLength, setPinLength] = useState<4 | 6>(4);
-  const [createPinVisible, setCreatePinVisible] = useState(false);
-  const [pinError, setPinError] = useState('');
-  const loadPasswords = usePasswordStore((s) => s.load);
-  const loadCards = useCardStore((s) => s.load);
-  const loadSettings = useSettingsStore((s) => s.loadSettings);
+  const [mode, setMode] = useState<Mode>('menu');
+  const [busy, setBusy] = useState(false);
+  const [hasPassword, setHasPassword] = useState(false);
+  const [reauthVisible, setReauthVisible] = useState(false);
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [restoreContent, setRestoreContent] = useState('');
+  const [restoreSecret, setRestoreSecret] = useState('');
+  const settings = useSettingsStore();
 
-  useEffect(() => {
-    getPinLength().then(setPinLength);
+  const refresh = useCallback(() => {
+    hasBackupPassword().then(setHasPassword);
   }, []);
+  useEffect(refresh, [refresh]);
 
-  const handleCreateBackup = () => {
-    setPinError('');
-    setCreatePinVisible(true);
-  };
+  const lastBackup = settings.lastBackupAt ? new Date(settings.lastBackupAt).toLocaleDateString() : 'Never';
 
-  const handleCreateWithPin = async (inputPin: string) => {
-    const ok = await verifyStoredPin(inputPin);
-    if (!ok) {
-      setPinError('Incorrect PIN.');
-      return;
-    }
-    setCreatePinVisible(false);
-    setLoading(true);
-    let fileUri: string | null = null;
+  const createBackup = async (destination: 'folder' | 'share') => {
+    setBusy(true);
     try {
-      fileUri = await createBackup(inputPin);
-      await shareBackup(fileUri);
-      Alert.alert('Backup Created', 'Your encrypted backup was created. Keep it somewhere safe — you will need this same PIN to restore it.');
-    } catch (e: any) {
-      Alert.alert('Error', e.message || 'Backup failed');
-    } finally {
-      // Remove the plaintext-on-disk backup file from cache once shared.
-      if (fileUri) cleanupTempFile(fileUri);
-      setLoading(false);
-    }
-  };
-
-  const proceedWithRestore = (uri: string) => {
-    setRestoreUri(uri);
-    setPin('');
-    setMode('restore-pin');
-  };
-
-  const handlePickRestore = async () => {
-    try {
-      // Accept ALL file types. `.vaultx` is a custom extension that Android
-      // can't map to a MIME type, so any narrower filter (or the OS itself)
-      // greys the file out in the picker. copyToCacheDirectory guarantees a
-      // readable local URI regardless of which provider it came from.
-      const doc = await runWithoutAutoLock(() =>
-        DocumentPicker.getDocumentAsync({
-          type: '*/*',
-          copyToCacheDirectory: true,
-          multiple: false,
-        }),
-      );
-      if (doc.canceled) return;
-      const asset = doc.assets[0];
-      const uri = asset.uri;
-      const name = (asset.name || '').toLowerCase();
-
-      // Do NOT hard-block on the extension: some providers return a display
-      // name without an extension. Validation happens for real when we try to
-      // decrypt the file (it carries a magic header). Backups are saved as
-      // .txt now (older ones were .vaultx); anything else just gets a soft
-      // confirmation.
-      const looksLikeBackup = name.endsWith('.txt') || name.endsWith('.vaultx');
-      if (name && !looksLikeBackup) {
-        Alert.alert(
-          'Use this file?',
-          "This doesn't look like a Passcard backup, but some file managers hide the extension. If this is your backup file, continue.",
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Continue', onPress: () => proceedWithRestore(uri) },
-          ],
-        );
-        return;
+      const backup = await buildBackup({
+        autoLockDuration: settings.autoLockDuration,
+        clipboardClearDuration: settings.clipboardClearDuration,
+        categories: settings.categories,
+      });
+      if (destination === 'folder') {
+        const saved = await saveBackupToFolder(backup);
+        if (!saved) return;
+        Alert.alert('Backup saved', `${backup.passwords} logins and ${backup.cards} cards saved as ${backup.filename}.`);
+      } else {
+        await shareBackup(backup);
       }
-      proceedWithRestore(uri);
+      await settings.update('lastBackupAt', new Date().toISOString());
     } catch (e) {
-      Alert.alert('Error', 'Failed to pick file');
-    }
-  };
-
-  const doRestore = async () => {
-    setLoading(true);
-    try {
-      const result = await restoreBackup(restoreUri, pin);
-      await loadPasswords();
-      await loadCards();
-      await loadSettings();
-      Alert.alert('Restored', `${result.passwords} passwords and ${result.cards} cards restored.`);
-      setMode('menu');
-      setPin('');
-      router.back();
-    } catch (e: any) {
-      Alert.alert('Restore Failed', e.message || 'Wrong PIN or corrupted backup');
+      Alert.alert('Backup failed', e instanceof Error ? e.message : 'Please try again.');
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
   };
 
-  const handleRestore = () => {
-    if (!pin || pin.length < 4) {
-      Alert.alert('Error', 'Enter the PIN used to create the backup');
+  const savePassword = async () => {
+    if (password.length < MIN_BACKUP_PASSWORD_LENGTH) {
+      Alert.alert('Too short', `Use at least ${MIN_BACKUP_PASSWORD_LENGTH} characters.`);
       return;
     }
+    if (password !== confirm) {
+      Alert.alert('Passwords differ', 'Type the same backup password twice.');
+      return;
+    }
+    setBusy(true);
+    try {
+      await setBackupPassword(password);
+      setPassword('');
+      setConfirm('');
+      setMode('menu');
+      refresh();
+      Alert.alert('Backup password set', 'You will need it to restore. Store it somewhere other than this phone.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const pickRestoreFile = async () => {
+    const doc = await runWithoutAutoLock(() =>
+      DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: true, multiple: false }),
+    );
+    if (doc.canceled) return;
+    const content = await readBackupFile(doc.assets[0].uri);
+    if (detectBackupKind(content) === 'unknown') {
+      Alert.alert('Not a backup', 'This file is not a Passcard Store backup.');
+      return;
+    }
+    setRestoreContent(content);
+    setRestoreSecret('');
+    setMode('restore-secret');
+  };
+
+  const apply = async (payload: BackupPayload, restoreMode: 'replace' | 'merge') => {
+    setBusy(true);
+    try {
+      const result = await applyBackup(payload, restoreMode);
+      const categories = backupCategories(payload);
+      if (categories) {
+        await settings.update('categories', [...new Set([...settings.categories, ...categories])]);
+      }
+      await Promise.all([usePasswordStore.getState().load(), useCardStore.getState().load()]);
+      Alert.alert(
+        'Restored',
+        `${result.passwords} logins and ${result.cards} cards restored.` +
+          (result.keptNewer ? ` ${result.keptNewer} kept from this phone because they were newer.` : ''),
+      );
+      setMode('menu');
+    } catch (e) {
+      Alert.alert('Restore failed', e instanceof Error ? e.message : 'Nothing was changed.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const restore = async () => {
+    setBusy(true);
+    let payload: BackupPayload;
+    try {
+      payload = await decryptBackup(restoreContent, restoreSecret);
+    } catch (e) {
+      setBusy(false);
+      Alert.alert('Could not open backup', e instanceof Error ? e.message : 'Check the password.');
+      return;
+    }
+    setBusy(false);
     Alert.alert(
-      'Replace all current data?',
-      'Restoring will permanently REPLACE all passwords and cards currently in this vault with the contents of the backup. This cannot be undone.',
+      'Restore backup',
+      `${payload.passwords.length} logins and ${payload.cards.length} cards in this backup.`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Replace', style: 'destructive', onPress: doRestore },
+        { text: 'Merge', onPress: () => apply(payload, 'merge') },
+        { text: 'Replace all', style: 'destructive', onPress: () => apply(payload, 'replace') },
       ],
     );
   };
 
+  const isLegacy = detectBackupKind(restoreContent) === 'legacy';
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => { setMode('menu'); router.back(); }} accessibilityLabel="Go back" accessibilityRole="button">
+        <TouchableOpacity onPress={() => (mode === 'menu' ? router.back() : setMode('menu'))} accessibilityLabel="Go back" accessibilityRole="button" style={styles.back}>
           <Ionicons name="chevron-back" size={24} color={Colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Backup & Restore</Text>
-        <View style={{ width: 24 }} />
+        <View style={{ width: 40 }} />
       </View>
 
-      <View style={styles.content}>
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={Colors.primary} />
-            <Text style={styles.loadingText}>Processing...</Text>
-          </View>
-        ) : mode === 'restore-pin' ? (
-          <View style={styles.restoreContainer}>
-            <Ionicons name="lock-open-outline" size={48} color={Colors.primary} />
-            <Text style={styles.restoreTitle}>Enter Backup PIN</Text>
-            <Text style={styles.restoreHint}>Enter the PIN used when creating this backup</Text>
-            <TextInput
-              style={styles.pinInput}
-              value={pin}
-              onChangeText={setPin}
-              placeholder="Enter PIN"
-              placeholderTextColor={Colors.textMuted}
-              keyboardType="number-pad"
-              secureTextEntry
-              maxLength={6}
-              accessibilityLabel="Backup PIN"
-            />
-            <TouchableOpacity style={styles.restoreButton} onPress={handleRestore} accessibilityRole="button">
-              <Text style={styles.restoreButtonText}>Restore Backup</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        {mode === 'menu' && (
           <>
-            <Text style={styles.description}>
-              Create encrypted backups of your data.{'\n'}
-              Backups are protected with AES-256 encryption and your PIN.
-            </Text>
-            <TouchableOpacity style={styles.actionButton} onPress={handleCreateBackup} accessibilityRole="button" accessibilityLabel="Create backup">
-              <View style={[styles.actionIcon, { backgroundColor: Colors.primary + '15' }]}>
-                <Ionicons name="cloud-upload-outline" size={28} color={Colors.primary} />
-              </View>
-              <View style={styles.actionText}>
-                <Text style={styles.actionTitle}>Create Backup</Text>
-                <Text style={styles.actionHint}>Encrypted backup file with all your data</Text>
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton} onPress={handlePickRestore} accessibilityRole="button" accessibilityLabel="Restore backup">
-              <View style={[styles.actionIcon, { backgroundColor: Colors.secondary + '15' }]}>
-                <Ionicons name="cloud-download-outline" size={28} color={Colors.secondary} />
-              </View>
-              <View style={styles.actionText}>
-                <Text style={styles.actionTitle}>Restore Backup</Text>
-                <Text style={styles.actionHint}>Import from a backup file (replaces current data)</Text>
-              </View>
+            <Text style={styles.status}>Last backup: {lastBackup}</Text>
+            {hasPassword ? (
+              <>
+                <TouchableOpacity style={styles.primary} onPress={() => createBackup('folder')} disabled={busy}>
+                  <Text style={styles.primaryText}>Save encrypted backup to a folder</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.secondary} onPress={() => createBackup('share')} disabled={busy}>
+                  <Text style={styles.secondaryText}>Share encrypted backup…</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.link} onPress={() => setReauthVisible(true)}>
+                  <Text style={styles.linkText}>Change backup password</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <Text style={styles.note}>
+                  Backups are protected by their own password, not your PIN, so a leaked file can&apos;t be opened by guessing digits.
+                </Text>
+                <TouchableOpacity style={styles.primary} onPress={() => setReauthVisible(true)}>
+                  <Text style={styles.primaryText}>Set a backup password</Text>
+                </TouchableOpacity>
+              </>
+            )}
+            <TouchableOpacity style={[styles.secondary, { marginTop: Spacing.xl }]} onPress={pickRestoreFile} disabled={busy}>
+              <Text style={styles.secondaryText}>Restore from a backup file</Text>
             </TouchableOpacity>
           </>
         )}
-      </View>
+
+        {mode === 'set-password' && (
+          <>
+            <Text style={styles.label}>Backup password</Text>
+            <TextInput style={styles.input} value={password} onChangeText={setPassword} secureTextEntry autoCapitalize="none" autoCorrect={false} accessibilityLabel="Backup password" />
+            <Text style={styles.label}>Type it again</Text>
+            <TextInput style={styles.input} value={confirm} onChangeText={setConfirm} secureTextEntry autoCapitalize="none" autoCorrect={false} accessibilityLabel="Confirm backup password" />
+            <Text style={styles.note}>At least {MIN_BACKUP_PASSWORD_LENGTH} characters. Nobody can recover it for you.</Text>
+            <TouchableOpacity style={styles.primary} onPress={savePassword} disabled={busy}>
+              <Text style={styles.primaryText}>Save backup password</Text>
+            </TouchableOpacity>
+          </>
+        )}
+
+        {mode === 'restore-secret' && (
+          <>
+            <Text style={styles.label}>{isLegacy ? 'PIN used when this backup was made' : 'Backup password'}</Text>
+            <TextInput
+              style={styles.input}
+              value={restoreSecret}
+              onChangeText={setRestoreSecret}
+              secureTextEntry
+              autoFocus
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType={isLegacy ? 'number-pad' : 'default'}
+              accessibilityLabel={isLegacy ? 'Backup PIN' : 'Backup password'}
+            />
+            <TouchableOpacity style={styles.primary} onPress={restore} disabled={busy || !restoreSecret}>
+              <Text style={styles.primaryText}>Open backup</Text>
+            </TouchableOpacity>
+          </>
+        )}
+        {busy && <ActivityIndicator style={{ marginTop: Spacing.xl }} size="large" color={Colors.primary} />}
+      </ScrollView>
 
       <PinModal
-        visible={createPinVisible}
-        pinLength={pinLength}
-        title="Confirm Your PIN"
-        subtitle="Your backup will be encrypted with this PIN"
-        error={pinError}
-        onComplete={handleCreateWithPin}
-        onClose={() => setCreatePinVisible(false)}
+        visible={reauthVisible}
+        title="Confirm it's you"
+        onVerified={() => {
+          setReauthVisible(false);
+          setMode('set-password');
+        }}
+        onClose={() => setReauthVisible(false)}
       />
     </SafeAreaView>
   );
@@ -216,21 +243,18 @@ export default function BackupScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.base, paddingVertical: Spacing.sm },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.sm, paddingVertical: Spacing.sm },
+  back: { padding: Spacing.sm },
   headerTitle: { fontSize: FontSize.md, fontWeight: '600', color: Colors.text },
-  content: { flex: 1, padding: Spacing.base },
-  description: { fontSize: FontSize.sm, color: Colors.textSecondary, lineHeight: 22, marginBottom: Spacing.xl, textAlign: 'center' },
-  actionButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, borderRadius: BorderRadius.lg, padding: Spacing.lg, marginBottom: Spacing.md, borderWidth: 1, borderColor: Colors.border, gap: Spacing.md },
-  actionIcon: { width: 52, height: 52, borderRadius: BorderRadius.md, alignItems: 'center', justifyContent: 'center' },
-  actionText: { flex: 1 },
-  actionTitle: { fontSize: FontSize.base, fontWeight: '600', color: Colors.text },
-  actionHint: { fontSize: FontSize.xs, color: Colors.textMuted, marginTop: 2 },
-  loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.base },
-  loadingText: { fontSize: FontSize.base, color: Colors.textSecondary },
-  restoreContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.base, paddingHorizontal: Spacing.xl },
-  restoreTitle: { fontSize: FontSize.xl, fontWeight: '700', color: Colors.text },
-  restoreHint: { fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center' },
-  pinInput: { backgroundColor: Colors.inputBackground, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: Colors.border, paddingHorizontal: Spacing.lg, height: 56, fontSize: FontSize.xl, color: Colors.text, textAlign: 'center', letterSpacing: 8, width: '100%' },
-  restoreButton: { backgroundColor: Colors.primary, borderRadius: BorderRadius.md, paddingVertical: Spacing.md, paddingHorizontal: Spacing['3xl'], marginTop: Spacing.md },
-  restoreButtonText: { fontSize: FontSize.base, fontWeight: '600', color: Colors.white },
+  content: { padding: Spacing.base, gap: Spacing.md },
+  status: { fontSize: FontSize.base, color: Colors.textSecondary },
+  note: { fontSize: FontSize.sm, color: Colors.textSecondary, lineHeight: 20 },
+  label: { fontSize: FontSize.sm, fontWeight: '600', color: Colors.textSecondary },
+  input: { minHeight: 52, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface, paddingHorizontal: Spacing.base, fontSize: FontSize.md, color: Colors.text },
+  primary: { minHeight: 52, borderRadius: BorderRadius.md, backgroundColor: Colors.secondary, alignItems: 'center', justifyContent: 'center', paddingHorizontal: Spacing.base },
+  primaryText: { color: Colors.white, fontSize: FontSize.base, fontWeight: '700' },
+  secondary: { minHeight: 52, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center' },
+  secondaryText: { color: Colors.text, fontSize: FontSize.base, fontWeight: '600' },
+  link: { padding: Spacing.sm, alignItems: 'center' },
+  linkText: { color: Colors.textSecondary, fontSize: FontSize.base, fontWeight: '600' },
 });

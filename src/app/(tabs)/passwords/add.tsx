@@ -7,9 +7,8 @@ import { Colors, FontSize, Spacing, BorderRadius } from '@/constants/theme';
 import PasswordStrengthIndicator from '@/components/PasswordStrengthIndicator';
 import SecureField from '@/components/SecureField';
 import { usePasswordStore } from '@/features/passwords/store';
-import { generatePassword } from '@/utils/password-generator';
+import { DEFAULT_PASSWORD_OPTIONS, generatePassword } from '@/utils/password-generator';
 import { DEFAULT_CATEGORIES } from '@/constants/categories';
-import type { PasswordCategory } from '@/types/password';
 
 export default function AddPasswordScreen() {
   const addPassword = usePasswordStore((s) => s.add);
@@ -19,7 +18,7 @@ export default function AddPasswordScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [notes, setNotes] = useState('');
-  const [category, setCategory] = useState<PasswordCategory>('Personal');
+  const [category, setCategory] = useState<string>('Personal');
   const [saving, setSaving] = useState(false);
   const [revealSignal, setRevealSignal] = useState(0);
 
@@ -29,7 +28,7 @@ export default function AddPasswordScreen() {
 
     setSaving(true);
     try {
-      await addPassword({ title, website: website || '', username: username || '', email: email || '', password, notes: notes || '', category });
+      await addPassword({ title, website: website || '', username: username || '', email: email || '', password, notes: notes || '', category, favorite: false, lastUsedAt: null, passwordChangedAt: null });
       router.back();
     } catch (e: any) {
       if (__DEV__) console.error('Password save error:', e);
@@ -40,7 +39,7 @@ export default function AddPasswordScreen() {
   };
 
   const handleGenerate = () => {
-    setPassword(generatePassword({ length: 20, includeLowercase: true, includeUppercase: true, includeNumbers: true, includeSymbols: true }));
+    setPassword(generatePassword(DEFAULT_PASSWORD_OPTIONS));
     // Reveal the generated password so the user can see what was created.
     setRevealSignal((n) => n + 1);
   };

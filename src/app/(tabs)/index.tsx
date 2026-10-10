@@ -10,7 +10,9 @@ import { passwordRepository } from '@/storage/password-repository';
 import { cardRepository } from '@/storage/card-repository';
 import type { PasswordEntry } from '@/types/password';
 import type { CardEntry } from '@/types/card';
-import { CATEGORY_ICONS } from '@/constants/categories';
+import { categoryIcon } from '@/constants/categories';
+import { usePasswordStore } from '@/features/passwords/store';
+import { useCardStore } from '@/features/cards/store';
 
 interface RecentItem {
   type: 'password' | 'card';
@@ -36,12 +38,16 @@ export default function DashboardScreen() {
     try {
       // Only what the dashboard actually shows — counts and a few recents.
       // (The list screens load their own full data on focus.)
-      const [pCount, cCount, recentPasswords, recentCards] = await Promise.all([
-        passwordRepository.count(),
-        cardRepository.count(),
-        passwordRepository.getRecent(3),
-        cardRepository.getRecent(3),
-      ]);
+      const allPasswords = usePasswordStore.getState().passwords;
+      const allCards = useCardStore.getState().cards;
+      const byCreated = <T extends { createdAt: string }>(list: T[]) =>
+        [...list].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 3);
+      const [pCount, cCount, recentPasswords, recentCards] = [
+        allPasswords.length,
+        allCards.length,
+        byCreated(allPasswords),
+        byCreated(allCards),
+      ];
       setPasswordCount(pCount);
       setCardCount(cCount);
 
@@ -152,7 +158,7 @@ export default function DashboardScreen() {
                     title={p.title}
                     subtitle={p.website || p.email}
                     leftIcon={
-                      <Text style={{ fontSize: 18 }}>{CATEGORY_ICONS[p.category] || '🔒'}</Text>
+                      <Text style={{ fontSize: 18 }}>{categoryIcon(p.category)}</Text>
                     }
                     rightText={new Date(p.createdAt).toLocaleDateString()}
                     onPress={() => router.push(`/(tabs)/passwords/${p.id}`)}
@@ -191,7 +197,7 @@ export default function DashboardScreen() {
           </Text>
           <TouchableOpacity
             style={styles.noticeButton}
-            onPress={() => router.push('/(tabs)/settings/export')}
+            onPress={() => router.push('/(tabs)/settings/backup')}
             activeOpacity={0.7}
           >
             <Ionicons name="shield-checkmark-outline" size={16} color={Colors.primary} />

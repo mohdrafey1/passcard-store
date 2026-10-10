@@ -13,7 +13,7 @@ import { showToast } from '@/utils/toast';
 import { sharePassword } from '@/utils/share';
 import { DEFAULT_CATEGORIES } from '@/constants/categories';
 import { passwordRepository } from '@/storage/password-repository';
-import type { PasswordEntry, PasswordCategory } from '@/types/password';
+import type { PasswordEntry } from '@/types/password';
 
 export default function PasswordDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -25,7 +25,7 @@ export default function PasswordDetailScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [notes, setNotes] = useState('');
-  const [category, setCategory] = useState<PasswordCategory>('Personal');
+  const [category, setCategory] = useState<string>('Personal');
   const updatePassword = usePasswordStore((s) => s.update);
   const removePassword = usePasswordStore((s) => s.remove);
   const clipboardDuration = useSettingsStore((s) => s.clipboardClearDuration);

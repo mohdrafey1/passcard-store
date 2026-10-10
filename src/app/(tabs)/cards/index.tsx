@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
@@ -77,27 +77,20 @@ function CreditCardWidget({ card, onPress, onLongPress }: { card: CardEntry; onP
 }
 
 export default function CardListScreen() {
-  const { cards, loading, load, remove } = useCardStore();
+  const { cards: allCards, loaded, remove } = useCardStore();
+  const loading = !loaded;
   const clipboardDuration = useSettingsStore((s) => s.clipboardClearDuration);
   const [searchQuery, setSearchQuery] = useState('');
   const [actionItem, setActionItem] = useState<CardEntry | null>(null);
   const debouncedSearch = useDebounce(searchQuery, 300);
 
-  useEffect(() => {
-    if (debouncedSearch) {
-      useCardStore.getState().search(debouncedSearch);
-    } else {
-      load();
-    }
-  }, [debouncedSearch]);
-
-  // Reload on focus so adds/edits/deletes made on child screens are reflected
-  // (the list stays mounted-but-frozen while a child screen is open).
-  useFocusEffect(
-    useCallback(() => {
-      if (!debouncedSearch) load();
-    }, [debouncedSearch]),
-  );
+  const cards = useMemo(() => {
+    const q = debouncedSearch.trim().toLowerCase();
+    if (!q) return allCards;
+    return allCards.filter(
+      (c) => c.cardNickname.toLowerCase().includes(q) || c.cardHolderName.toLowerCase().includes(q) || c.cardNumber.slice(-4).includes(q),
+    );
+  }, [allCards, debouncedSearch]);
 
   // The store already narrows `cards` to search results when searching, so the
   // list can render it directly (no fragile "call the selector" pattern).

@@ -1,109 +1,134 @@
 import * as SecureStore from 'expo-secure-store';
 
-const MAX_ATTEMPTS = 5;
-const LOCKOUT_DURATION_MS = 60 * 1000; // 1 minute
-const STORAGE_KEY = 'LOCKOUT_STATE';
+/**
+ * Wrong-PIN rate limiting shared by every PIN/passphrase prompt (unlock,
+ * re-auth before export/backup/erase, change PIN).
+ *
+ * Every 5 wrong attempts start a lockout that grows each round:
+ * 1 min → 5 min → 15 min → 1 h (then stays at 1 h). Only a correct entry
+ * resets it. State is persisted, so killing the app doesn't reset the count.
+ * `totalFailures` feeds the optional "erase after 10 wrong attempts" setting.
+ */
 
-interface LockoutState {
+const STORAGE_KEY = 'LOCKOUT_STATE';
+export const ATTEMPTS_PER_ROUND = 5;
+export const LOCKOUT_STEPS_SECONDS = [60, 300, 900, 3600] as const;
+export const WIPE_THRESHOLD = 10;
+
+export interface LockoutState {
+  /** Wrong attempts in the current round. */
   failedAttempts: number;
   lockoutUntil: number | null;
+  /** Lockouts since the last correct entry; picks the next duration. */
+  lockouts: number;
+  /** Wrong attempts since the last correct entry. */
+  totalFailures: number;
 }
 
-let state: LockoutState = {
-  failedAttempts: 0,
-  lockoutUntil: null,
-};
+export interface LockoutStatus {
+  lockedOut: boolean;
+  remainingSeconds: number;
+  attemptsLeft: number;
+  totalFailures: number;
+}
 
+const INITIAL: LockoutState = { failedAttempts: 0, lockoutUntil: null, lockouts: 0, totalFailures: 0 };
+
+// ---- Pure logic (unit tested) ----
+
+/** Clear an expired lockout so a new round of attempts can begin. */
+export function settle(state: LockoutState, now: number): LockoutState {
+  if (state.lockoutUntil !== null && now >= state.lockoutUntil) {
+    return { ...state, failedAttempts: 0, lockoutUntil: null };
+  }
+  return state;
+}
+
+export function applyFailure(state: LockoutState, now: number): LockoutState {
+  const s = settle(state, now);
+  if (s.lockoutUntil !== null) return s; // attempts are ignored while locked
+  const failedAttempts = s.failedAttempts + 1;
+  const totalFailures = s.totalFailures + 1;
+  if (failedAttempts >= ATTEMPTS_PER_ROUND) {
+    const step = LOCKOUT_STEPS_SECONDS[Math.min(s.lockouts, LOCKOUT_STEPS_SECONDS.length - 1)];
+    return { failedAttempts, totalFailures, lockouts: s.lockouts + 1, lockoutUntil: now + step * 1000 };
+  }
+  return { ...s, failedAttempts, totalFailures };
+}
+
+export function statusOf(state: LockoutState, now: number): LockoutStatus {
+  const s = settle(state, now);
+  const remainingMs = s.lockoutUntil === null ? 0 : s.lockoutUntil - now;
+  return {
+    lockedOut: remainingMs > 0,
+    remainingSeconds: Math.ceil(Math.max(0, remainingMs) / 1000),
+    attemptsLeft: Math.max(0, ATTEMPTS_PER_ROUND - s.failedAttempts),
+    totalFailures: s.totalFailures,
+  };
+}
+
+/** "1 minute", "15 minutes", "1 hour" for the next lockout after this one. */
+export function formatDuration(seconds: number): string {
+  if (seconds >= 3600) {
+    const h = Math.ceil(seconds / 3600);
+    return `${h} hour${h === 1 ? '' : 's'}`;
+  }
+  if (seconds >= 60) {
+    const m = Math.ceil(seconds / 60);
+    return `${m} minute${m === 1 ? '' : 's'}`;
+  }
+  return `${seconds} second${seconds === 1 ? '' : 's'}`;
+}
+
+// ---- Persisted state ----
+
+let state: LockoutState = INITIAL;
 let hydrated = false;
 
-/**
- * Persist the in-memory lockout state so it survives an app restart.
- * Without this, an attacker can reset the failed-attempt counter simply by
- * force-stopping and reopening the app, defeating the lockout entirely.
- */
-function persist(): void {
-  // Fire-and-forget; a failed write must never block the auth UI.
-  SecureStore.setItemAsync(STORAGE_KEY, JSON.stringify(state)).catch(() => {});
+function parse(raw: string | null): LockoutState {
+  if (!raw) return INITIAL;
+  try {
+    const p = JSON.parse(raw) as Partial<LockoutState>;
+    if (typeof p.failedAttempts !== 'number') return INITIAL;
+    return {
+      failedAttempts: p.failedAttempts,
+      lockoutUntil: typeof p.lockoutUntil === 'number' ? p.lockoutUntil : null,
+      lockouts: typeof p.lockouts === 'number' ? p.lockouts : 0,
+      totalFailures: typeof p.totalFailures === 'number' ? p.totalFailures : p.failedAttempts,
+    };
+  } catch {
+    return INITIAL;
+  }
 }
 
-/**
- * Hydrate lockout state from secure storage. Call once on the unlock screen
- * before reading lockout status so a persisted lockout is respected.
- */
 export async function initLockout(): Promise<void> {
   if (hydrated) return;
-  try {
-    const raw = await SecureStore.getItemAsync(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw) as LockoutState;
-      if (
-        typeof parsed.failedAttempts === 'number' &&
-        (parsed.lockoutUntil === null || typeof parsed.lockoutUntil === 'number')
-      ) {
-        state = parsed;
-      }
-    }
-  } catch {
-    // Corrupt/absent state — start fresh.
-  } finally {
-    hydrated = true;
-  }
+  state = parse(await SecureStore.getItemAsync(STORAGE_KEY).catch(() => null));
+  hydrated = true;
 }
 
-/**
- * Check if the app is currently locked out.
- */
-export function isLockedOut(): boolean {
-  if (state.lockoutUntil === null) return false;
-  if (Date.now() >= state.lockoutUntil) {
-    resetLockout();
-    return false;
-  }
-  return true;
+async function persist(): Promise<void> {
+  await SecureStore.setItemAsync(STORAGE_KEY, JSON.stringify(state)).catch(() => {});
 }
 
-/**
- * Get remaining lockout time in seconds
- */
-export function getLockoutRemainingSeconds(): number {
-  if (state.lockoutUntil === null) return 0;
-  const remaining = Math.max(0, state.lockoutUntil - Date.now());
-  return Math.ceil(remaining / 1000);
+export function getLockoutStatus(): LockoutStatus {
+  return statusOf(state, Date.now());
 }
 
-/**
- * Record a failed attempt. Returns true if now locked out.
- */
-export function recordFailedAttempt(): boolean {
-  state.failedAttempts += 1;
-  let lockedNow = false;
-  if (state.failedAttempts >= MAX_ATTEMPTS) {
-    state.lockoutUntil = Date.now() + LOCKOUT_DURATION_MS;
-    lockedNow = true;
-  }
-  persist();
-  return lockedNow;
+/** Record a wrong PIN. Persisted before returning, so it survives a force-quit. */
+export async function recordFailure(): Promise<LockoutStatus> {
+  await initLockout();
+  state = applyFailure(state, Date.now());
+  await persist();
+  return getLockoutStatus();
 }
 
-/**
- * Reset lockout state on successful authentication
- */
-export function resetLockout(): void {
-  state.failedAttempts = 0;
-  state.lockoutUntil = null;
-  persist();
+export async function recordSuccess(): Promise<void> {
+  state = INITIAL;
+  await persist();
 }
 
-/**
- * Get current failed attempt count
- */
-export function getFailedAttempts(): number {
-  return state.failedAttempts;
-}
-
-/**
- * Get remaining attempts before lockout
- */
-export function getRemainingAttempts(): number {
-  return Math.max(0, MAX_ATTEMPTS - state.failedAttempts);
+export async function resetLockoutState(): Promise<void> {
+  state = INITIAL;
+  await SecureStore.deleteItemAsync(STORAGE_KEY).catch(() => {});
 }

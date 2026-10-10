@@ -1,157 +1,198 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { StyleSheet, Text, View, ActivityIndicator } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import PinPad from '@/components/PinPad';
-import { getPinLength } from '@/security/pin';
-import {
-  unlockWithPin,
-  unlockWithBiometricKey,
-  enableBiometricKey,
-} from '@/security/key-manager';
-import { authenticateWithBiometrics, isBiometricAvailable } from '@/security/biometrics';
-import { isLockedOut, recordFailedAttempt, resetLockout, getLockoutRemainingSeconds, getRemainingAttempts, initLockout } from '@/security/lockout';
-import { useSettingsStore } from '@/features/settings/store';
-import { Colors, FontSize, Spacing } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
+import PinPad from '@/components/PinPad';
+import { Colors, FontSize, Spacing } from '@/constants/theme';
+import { useSettingsStore } from '@/features/settings/store';
+import { checkSecretWithLockout, completeUnlock, currentLockoutMessage } from '@/features/session/session';
+import {
+  dismissBiometricReoffer,
+  enableBiometricUnlock,
+  shouldReofferBiometrics,
+  unlockWithBiometrics,
+  unlockWithSecret,
+} from '@/security/key-manager';
+import { getLockoutStatus, initLockout } from '@/security/lockout';
 
 export default function UnlockScreen() {
-  const [error, setError] = useState('');
-  const [pinLength, setPinLength] = useState<4 | 6>(4);
-  const [lockedOut, setLockedOut] = useState(false);
-  const [lockoutSeconds, setLockoutSeconds] = useState(0);
-  const [canBiometric, setCanBiometric] = useState(false);
-  const [verifying, setVerifying] = useState(false);
+  const method = useSettingsStore((s) => s.unlockMethod);
+  const pinLength = useSettingsStore((s) => s.pinLength) ?? 6;
   const biometricsEnabled = useSettingsStore((s) => s.biometricsEnabled);
-  const setAuthenticated = useSettingsStore((s) => s.setAuthenticated);
+  const biometricsAvailable = useSettingsStore((s) => s.biometricsAvailable);
+  const refreshSecurity = useSettingsStore((s) => s.refreshSecurity);
+  const [error, setError] = useState('');
+  const [lockedOut, setLockedOut] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [passphrase, setPassphrase] = useState('');
+  const promptedRef = useRef(false);
+  const noun = method === 'pin' ? 'PIN' : 'passphrase';
 
-  useEffect(() => {
-    async function init() {
-      await initLockout();
-      if (isLockedOut()) {
-        setLockedOut(true);
-        setLockoutSeconds(getLockoutRemainingSeconds());
-      }
-      const len = await getPinLength();
-      setPinLength(len);
-
-      if (biometricsEnabled) {
-        const available = await isBiometricAvailable();
-        setCanBiometric(available);
-        if (available && !isLockedOut()) {
-          handleBiometric();
-        }
-      }
-    }
-    init();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [biometricsEnabled]);
-
-  // Lockout timer
-  useEffect(() => {
-    if (!lockedOut) return;
-    const interval = setInterval(() => {
-      const remaining = getLockoutRemainingSeconds();
-      if (remaining <= 0) {
-        setLockedOut(false);
-        setLockoutSeconds(0);
-        setError('');
-      } else {
-        setLockoutSeconds(remaining);
-      }
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [lockedOut]);
-
-  const registerLockout = useCallback(() => {
-    setLockedOut(true);
-    setLockoutSeconds(getLockoutRemainingSeconds());
-    setError('Too many failed attempts. Try again in 1 minute.');
+  const refreshLockout = useCallback(() => {
+    const message = currentLockoutMessage();
+    setLockedOut(message !== null);
+    if (message) setError(message);
+    return message !== null;
   }, []);
 
+  const finish = useCallback(async () => {
+    await completeUnlock();
+    router.replace('/(tabs)');
+  }, []);
+
+  /** Users upgrading from v1.1 had fingerprint unlock on; offer it again. */
+  const maybeReofferBiometrics = useCallback(async () => {
+    if (!(await shouldReofferBiometrics())) return;
+    await dismissBiometricReoffer();
+    if (!biometricsAvailable) return;
+    await new Promise<void>((resolve) =>
+      Alert.alert(
+        'Keep fingerprint unlock?',
+        'Fingerprint unlock now keeps your vault key in Android’s secure hardware. Confirm your fingerprint once to keep using it.',
+        [
+          { text: 'Not now', style: 'cancel', onPress: () => resolve() },
+          {
+            text: 'Keep it',
+            onPress: async () => {
+              await enableBiometricUnlock().catch(() => {});
+              await refreshSecurity();
+              resolve();
+            },
+          },
+        ],
+        { cancelable: false },
+      ),
+    );
+  }, [biometricsAvailable, refreshSecurity]);
+
   const handleBiometric = useCallback(async () => {
-    if (isLockedOut()) {
-      setLockedOut(true);
-      setLockoutSeconds(getLockoutRemainingSeconds());
-      return;
-    }
-    const result = await authenticateWithBiometrics();
-    if (result.success) {
-      const opened = await unlockWithBiometricKey();
-      if (opened) {
-        resetLockout();
-        setAuthenticated(true);
-        router.replace('/(tabs)');
+    if (refreshLockout() || busy) return;
+    setBusy(true);
+    try {
+      const result = await unlockWithBiometrics();
+      if (result === 'ok') {
+        await finish();
         return;
       }
-      // Biometrics passed but no key is provisioned for it — fall back to PIN.
-      setError('Please unlock with your PIN.');
-    } else if (result.error === 'authentication_failed' || result.error === 'lockout') {
-      // A genuine biometric mismatch counts toward the lockout too.
-      if (recordFailedAttempt()) registerLockout();
-    }
-  }, [setAuthenticated, registerLockout]);
-
-  const handlePinComplete = useCallback(async (pin: string) => {
-    if (isLockedOut()) {
-      setLockedOut(true);
-      setLockoutSeconds(getLockoutRemainingSeconds());
-      return;
-    }
-
-    setVerifying(true);
-    let valid = false;
-    try {
-      valid = await unlockWithPin(pin);
+      if (result === 'invalidated') {
+        await refreshSecurity();
+        setError(`Fingerprints changed on this phone. Unlock with your ${noun}, then turn fingerprint unlock on again.`);
+      }
     } finally {
-      setVerifying(false);
+      setBusy(false);
     }
-    if (valid) {
-      resetLockout();
-      // Re-provision the biometric key slot for users who had biometrics on
-      // before this build (migration) so future biometric unlocks work.
-      if (biometricsEnabled) {
-        await enableBiometricKey().catch(() => {});
+  }, [busy, finish, noun, refreshLockout, refreshSecurity]);
+
+  useEffect(() => {
+    initLockout().then(() => {
+      const locked = refreshLockout();
+      if (!locked && biometricsEnabled && !promptedRef.current) {
+        promptedRef.current = true;
+        handleBiometric();
       }
-      setAuthenticated(true);
-      router.replace('/(tabs)');
-    } else {
-      const locked = recordFailedAttempt();
-      if (locked) {
-        registerLockout();
+    });
+    // Run once on mount; later prompts come from the fingerprint key.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Count down an active lockout.
+  useEffect(() => {
+    if (!lockedOut) return;
+    const timer = setInterval(() => {
+      if (!getLockoutStatus().lockedOut) {
+        setLockedOut(false);
+        setError('');
       } else {
-        const remaining = getRemainingAttempts();
-        setError(`Wrong PIN. ${remaining} attempt${remaining !== 1 ? 's' : ''} remaining.`);
+        refreshLockout();
       }
-    }
-  }, [setAuthenticated, biometricsEnabled, registerLockout]);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [lockedOut, refreshLockout]);
+
+  const submit = useCallback(
+    async (secret: string) => {
+      if (!secret || busy) return;
+      setBusy(true);
+      try {
+        const result = await checkSecretWithLockout(() => unlockWithSecret(secret), noun);
+        if (result.ok) {
+          await maybeReofferBiometrics();
+          await finish();
+          return;
+        }
+        if (result.erased) {
+          router.replace('/');
+          return;
+        }
+        setError(result.message);
+        setLockedOut(result.lockedOut);
+      } catch (e) {
+        // Error messages from the crypto/storage layer never contain secrets.
+        console.warn('Unlock failed:', e instanceof Error ? e.message : String(e));
+        setError('Something went wrong reading the vault. Try again.');
+      } finally {
+        setPassphrase('');
+        setBusy(false);
+      }
+    },
+    [busy, finish, maybeReofferBiometrics, noun],
+  );
 
   return (
     <SafeAreaView style={styles.container}>
       {lockedOut ? (
-        <View style={styles.lockoutContainer}>
-          <Ionicons name="lock-closed" size={64} color={Colors.danger} />
-          <Text style={styles.lockoutTitle}>App Locked</Text>
-          <Text style={styles.lockoutSubtitle}>
-            Too many failed attempts.{'\n'}
-            Try again in {lockoutSeconds} second{lockoutSeconds !== 1 ? 's' : ''}.
+        <View style={styles.center}>
+          <Ionicons name="lock-closed" size={56} color={Colors.danger} />
+          <Text style={styles.lockTitle}>Locked for now</Text>
+          <Text style={styles.lockText} accessibilityLiveRegion="polite">
+            {error}
           </Text>
         </View>
-      ) : (
+      ) : method === 'pin' ? (
         <PinPad
           pinLength={pinLength}
-          onComplete={handlePinComplete}
-          onBiometric={canBiometric ? handleBiometric : undefined}
-          showBiometric={canBiometric}
-          title="Unlock Vault"
-          subtitle="Enter your PIN to access your data"
+          onComplete={submit}
+          onBiometric={biometricsEnabled ? handleBiometric : undefined}
+          showBiometric={biometricsEnabled}
+          title="Welcome back"
+          subtitle={`Enter your ${pinLength}-digit PIN`}
           error={error}
         />
+      ) : (
+        <View style={styles.center}>
+          <Text style={styles.lockTitle}>Welcome back</Text>
+          <TextInput
+            style={styles.input}
+            value={passphrase}
+            onChangeText={setPassphrase}
+            secureTextEntry
+            autoFocus
+            autoCapitalize="none"
+            autoCorrect={false}
+            accessibilityLabel="Passphrase"
+            placeholder="Passphrase"
+            placeholderTextColor={Colors.textMuted}
+            onSubmitEditing={() => submit(passphrase)}
+            returnKeyType="go"
+          />
+          <Text style={styles.error} accessibilityLiveRegion="polite">
+            {error}
+          </Text>
+          <TouchableOpacity style={styles.button} onPress={() => submit(passphrase)} accessibilityRole="button">
+            <Text style={styles.buttonText}>Unlock</Text>
+          </TouchableOpacity>
+          {biometricsEnabled && (
+            <TouchableOpacity onPress={handleBiometric} style={styles.link} accessibilityRole="button">
+              <Text style={styles.linkText}>Use fingerprint</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       )}
-      {verifying && (
-        <View style={styles.verifyingOverlay} pointerEvents="auto">
+      {busy && (
+        <View style={styles.overlay}>
           <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={styles.verifyingText}>Unlocking…</Text>
+          <Text style={styles.overlayText}>Unlocking…</Text>
         </View>
       )}
     </SafeAreaView>
@@ -159,43 +200,39 @@ export default function UnlockScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
+  container: { flex: 1, backgroundColor: Colors.background },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: Spacing.xl, gap: Spacing.md },
+  lockTitle: { fontSize: FontSize.xl, fontWeight: '700', color: Colors.text },
+  lockText: { fontSize: FontSize.base, color: Colors.textSecondary, textAlign: 'center', lineHeight: 22 },
+  input: {
+    alignSelf: 'stretch',
+    minHeight: 52,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surface,
+    paddingHorizontal: Spacing.base,
+    fontSize: FontSize.md,
+    color: Colors.text,
   },
-  lockoutContainer: {
-    flex: 1,
+  error: { minHeight: 20, color: Colors.danger, fontSize: FontSize.sm, textAlign: 'center' },
+  button: {
+    alignSelf: 'stretch',
+    minHeight: 52,
+    borderRadius: 14,
+    backgroundColor: Colors.secondary,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: Spacing.xl,
   },
-  verifyingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+  buttonText: { color: Colors.white, fontSize: FontSize.base, fontWeight: '700' },
+  link: { padding: Spacing.md },
+  linkText: { color: Colors.textSecondary, fontSize: FontSize.base, fontWeight: '600' },
+  overlay: {
+    ...StyleSheet.absoluteFill,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(246, 242, 235, 0.7)',
     gap: Spacing.md,
+    backgroundColor: 'rgba(246, 242, 235, 0.7)',
   },
-  verifyingText: {
-    fontSize: FontSize.base,
-    fontWeight: '600',
-    color: Colors.textSecondary,
-  },
-  lockoutTitle: {
-    fontSize: FontSize.xl,
-    fontWeight: '700',
-    color: Colors.danger,
-    marginTop: Spacing.lg,
-    marginBottom: Spacing.sm,
-  },
-  lockoutSubtitle: {
-    fontSize: FontSize.base,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 24,
-  },
+  overlayText: { fontSize: FontSize.base, fontWeight: '600', color: Colors.textSecondary },
 });

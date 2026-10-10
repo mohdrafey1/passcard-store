@@ -4,86 +4,63 @@ import { cardRepository } from '@/storage/card-repository';
 
 interface CardState {
   cards: CardEntry[];
-  loading: boolean;
-  searchQuery: string;
-  // Actions
+  loaded: boolean;
   load: () => Promise<void>;
   add: (data: CardFormData) => Promise<CardEntry>;
-  update: (id: string, data: Partial<CardEntry>) => Promise<void>;
+  update: (id: string, data: Partial<CardFormData>) => Promise<CardEntry>;
+  toggleFavorite: (id: string) => Promise<void>;
+  markUsed: (id: string) => Promise<void>;
+  /** Moves to Recently deleted. */
   remove: (id: string) => Promise<void>;
-  search: (query: string) => Promise<void>;
-  setSearchQuery: (query: string) => void;
-  getFiltered: () => CardEntry[];
+  restore: (id: string) => Promise<void>;
+  /** Drop decrypted data from memory (on lock). */
+  reset: () => void;
 }
+
+const replace = (list: CardEntry[], entry: CardEntry) => list.map((c) => (c.id === entry.id ? entry : c));
 
 export const useCardStore = create<CardState>((set, get) => ({
   cards: [],
-  loading: false,
-  searchQuery: '',
+  loaded: false,
 
   load: async () => {
-    set({ loading: true });
-    try {
-      const cards = await cardRepository.findAll();
-      set({ cards, loading: false });
-    } catch (error) {
-      if (__DEV__) console.error('Failed to load cards:', error);
-      set({ loading: false });
-    }
+    const cards = await cardRepository.findAll();
+    set({ cards, loaded: true });
   },
 
-  add: async (data: CardFormData) => {
+  add: async (data) => {
     const entry = await cardRepository.create(data);
-    set((state) => ({ cards: [entry, ...state.cards] }));
+    set((s) => ({ cards: [entry, ...s.cards] }));
     return entry;
   },
 
-  update: async (id: string, data: Partial<CardEntry>) => {
+  update: async (id, data) => {
     const updated = await cardRepository.update(id, data);
-    set((state) => ({
-      cards: state.cards.map((c) => (c.id === id ? updated : c)),
-    }));
+    set((s) => ({ cards: replace(s.cards, updated).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)) }));
+    return updated;
   },
 
-  remove: async (id: string) => {
-    await cardRepository.delete(id);
-    set((state) => ({
-      cards: state.cards.filter((c) => c.id !== id),
-    }));
+  toggleFavorite: async (id) => {
+    const current = get().cards.find((c) => c.id === id);
+    if (!current) return;
+    const updated = await cardRepository.update(id, { favorite: !current.favorite }, { touch: false });
+    set((s) => ({ cards: replace(s.cards, updated) }));
   },
 
-  search: async (query: string) => {
-    set({ searchQuery: query });
-    if (!query.trim()) {
-      await get().load();
-      return;
-    }
-    try {
-      const results = await cardRepository.search(query.toLowerCase(), [
-        'search_nickname',
-        'search_last_four',
-        'search_holder_name',
-      ]);
-      set({ cards: results });
-    } catch (error) {
-      if (__DEV__) console.error('Failed to search cards:', error);
-    }
+  markUsed: async (id) => {
+    const updated = await cardRepository.update(id, { lastUsedAt: new Date().toISOString() }, { touch: false });
+    set((s) => ({ cards: replace(s.cards, updated) }));
   },
 
-  setSearchQuery: (query: string) => {
-    set({ searchQuery: query });
+  remove: async (id) => {
+    await cardRepository.softDelete(id);
+    set((s) => ({ cards: s.cards.filter((c) => c.id !== id) }));
   },
 
-  getFiltered: () => {
-    const { cards, searchQuery } = get();
-    if (!searchQuery.trim()) return cards;
-
-    const q = searchQuery.toLowerCase();
-    return cards.filter(
-      (c) =>
-        c.cardNickname.toLowerCase().includes(q) ||
-        c.cardHolderName.toLowerCase().includes(q) ||
-        c.cardNumber.slice(-4).includes(q),
-    );
+  restore: async (id) => {
+    await cardRepository.restore(id);
+    await get().load();
   },
+
+  reset: () => set({ cards: [], loaded: false }),
 }));

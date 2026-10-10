@@ -1,36 +1,42 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import PinPad from '@/components/PinPad';
-import { verifyStoredPin, getPinLength, changePin } from '@/security/pin';
-import { rewrapForNewPin } from '@/security/key-manager';
+import { changeSecret } from '@/security/key-manager';
+import { weakPinReason } from '@/security/pin-rules';
+import { verifyWithLockout } from '@/features/session/session';
+import { useSettingsStore } from '@/features/settings/store';
 import { Colors, FontSize, Spacing } from '@/constants/theme';
 
 type Step = 'current' | 'new' | 'confirm';
 
 export default function ChangePinScreen() {
   const [step, setStep] = useState<Step>('current');
-  const [pinLength, setPinLength] = useState<4 | 6>(4);
+  const pinLength = useSettingsStore((s) => s.pinLength) ?? 6;
+  const refreshSecurity = useSettingsStore((s) => s.refreshSecurity);
   const [newPin, setNewPin] = useState('');
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    getPinLength().then(setPinLength);
-  }, []);
-
   const handleCurrent = async (pin: string) => {
-    const ok = await verifyStoredPin(pin);
-    if (ok) {
+    const result = await verifyWithLockout(pin, 'PIN');
+    if (result.ok) {
       setError('');
       setStep('new');
+    } else if (result.erased) {
+      router.replace('/');
     } else {
-      setError('Incorrect current PIN.');
+      setError(result.message);
     }
   };
 
   const handleNew = (pin: string) => {
+    const weak = weakPinReason(pin);
+    if (weak) {
+      setError(`${weak} Choose another PIN.`);
+      return;
+    }
     setNewPin(pin);
     setError('');
     setStep('confirm');
@@ -44,15 +50,15 @@ export default function ChangePinScreen() {
       return;
     }
     try {
-      // Update the stored PIN hash and re-wrap the data key under the new PIN.
-      await changePin(pin);
-      await rewrapForNewPin(pin);
+      // One atomic write replaces the key slot; the old PIN stops working.
+      await changeSecret(pin, 'pin', pinLength);
+      await refreshSecurity();
       Alert.alert('Success', 'Your PIN has been changed.');
       router.back();
     } catch {
       setError('Failed to change PIN. Please try again.');
       setNewPin('');
-      setStep('current');
+      setStep('new');
     }
   };
 

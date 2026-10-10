@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -7,19 +7,13 @@ import { Colors, FontSize, Spacing, BorderRadius } from '@/constants/theme';
 import { exportPasswordsToCSV, exportCardsToCSV, exportAndShareCSV } from '@/features/import-export/csv-handler';
 import { passwordRepository } from '@/storage/password-repository';
 import { cardRepository } from '@/storage/card-repository';
-import { verifyStoredPin, getPinLength } from '@/security/pin';
 import PinModal from '@/components/PinModal';
 
 export default function ExportScreen() {
   const [loading, setLoading] = useState(false);
-  const [pinLength, setPinLength] = useState<4 | 6>(4);
   const [pinVisible, setPinVisible] = useState(false);
-  const [pinError, setPinError] = useState('');
   const [pendingType, setPendingType] = useState<'passwords' | 'cards' | null>(null);
 
-  useEffect(() => {
-    getPinLength().then(setPinLength);
-  }, []);
 
   const runExport = async (type: 'passwords' | 'cards') => {
     setLoading(true);
@@ -52,16 +46,10 @@ export default function ExportScreen() {
   // unattended can't be used to dump the vault to a plaintext CSV.
   const handleExport = (type: 'passwords' | 'cards') => {
     setPendingType(type);
-    setPinError('');
     setPinVisible(true);
   };
 
-  const handlePinComplete = async (pin: string) => {
-    const ok = await verifyStoredPin(pin);
-    if (!ok) {
-      setPinError('Incorrect PIN.');
-      return;
-    }
+  const handleVerified = () => {
     setPinVisible(false);
     const type = pendingType;
     setPendingType(null);
@@ -112,11 +100,9 @@ export default function ExportScreen() {
 
       <PinModal
         visible={pinVisible}
-        pinLength={pinLength}
-        title="Confirm Your PIN"
-        subtitle="Enter your PIN to export data"
-        error={pinError}
-        onComplete={handlePinComplete}
+        title="Confirm it's you"
+        
+        onVerified={handleVerified}
         onClose={() => { setPinVisible(false); setPendingType(null); }}
       />
     </SafeAreaView>
