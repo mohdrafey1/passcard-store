@@ -93,12 +93,7 @@ export function lockSession(): void {
 
 // ---- Key slot ----
 
-async function buildSlot(
-  dataKey: Uint8Array,
-  secret: string,
-  method: UnlockMethod,
-  pinLength: 4 | 6 | null,
-): Promise<KeySlot> {
+async function buildSlot(dataKey: Uint8Array, secret: string, method: UnlockMethod, pinLength: 4 | 6 | null): Promise<KeySlot> {
   const kdf = await createKdfParams();
   const kekBytes = await deriveKey(secret, kdf);
   try {
@@ -180,9 +175,7 @@ async function legacyUnwrap(pin: string): Promise<string | null> {
 }
 
 async function deleteLegacyKeys(): Promise<void> {
-  await Promise.all(
-    Object.values(LEGACY).map((k) => SecureStore.deleteItemAsync(k).catch(() => {})),
-  );
+  await Promise.all(Object.values(LEGACY).map((k) => SecureStore.deleteItemAsync(k).catch(() => {})));
 }
 
 // ---- Public API ----
@@ -200,9 +193,7 @@ export async function hasVault(): Promise<boolean> {
 export async function getUnlockInfo(): Promise<UnlockInfo> {
   const slot = await readSlot();
   if (slot) {
-    return slot.method === 'pin'
-      ? { method: 'pin', pinLength: slot.pinLength ?? 6 }
-      : { method: 'passphrase', pinLength: null };
+    return slot.method === 'pin' ? { method: 'pin', pinLength: slot.pinLength ?? 6 } : { method: 'passphrase', pinLength: null };
   }
   const legacyLength = await SecureStore.getItemAsync(LEGACY.pinLength);
   return { method: 'pin', pinLength: legacyLength === '6' ? 6 : 4 };
@@ -290,10 +281,7 @@ export async function enableBiometricUnlock(): Promise<void> {
 }
 
 export async function disableBiometricUnlock(): Promise<void> {
-  await Promise.all([
-    SecureStore.deleteItemAsync(BIO_KEY).catch(() => {}),
-    SecureStore.deleteItemAsync(BIO_FLAG).catch(() => {}),
-  ]);
+  await Promise.all([SecureStore.deleteItemAsync(BIO_KEY).catch(() => {}), SecureStore.deleteItemAsync(BIO_FLAG).catch(() => {})]);
 }
 
 export type BiometricUnlockResult = 'ok' | 'cancelled' | 'invalidated';
@@ -356,8 +344,6 @@ export async function dismissBiometricReoffer(): Promise<void> {
 export async function wipeKeys(): Promise<void> {
   session = null;
   await Promise.all(
-    [SLOT_KEY, BIO_KEY, BIO_FLAG, BIO_REOFFER, ...Object.values(LEGACY)].map((k) =>
-      SecureStore.deleteItemAsync(k).catch(() => {}),
-    ),
+    [SLOT_KEY, BIO_KEY, BIO_FLAG, BIO_REOFFER, ...Object.values(LEGACY)].map((k) => SecureStore.deleteItemAsync(k).catch(() => {})),
   );
 }

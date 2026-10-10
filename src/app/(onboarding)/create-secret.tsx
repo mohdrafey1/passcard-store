@@ -86,7 +86,7 @@ export default function CreateSecretScreen() {
   };
 
   const phraseProblem =
-    weakPassphraseReason(phrase) ?? (phrase && strength.score < 2 ? strength.hint ?? 'Too easy to guess. Add more words.' : null);
+    weakPassphraseReason(phrase) ?? (phrase && strength.score < 2 ? (strength.hint ?? 'Too easy to guess. Add more words.') : null);
 
   const onPhrase = () => {
     if (phraseProblem) {

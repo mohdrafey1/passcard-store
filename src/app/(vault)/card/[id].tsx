@@ -88,7 +88,12 @@ export default function CardDetailScreen() {
             <IconButton icon="copy" tone="brass" label="Copy card number" onPress={() => copy(card.cardNumber, 'Card number', ref)} />
           </DetailRow>
           <DetailRow label="Expiry" value={formatExpiry(card.expiryMonth, card.expiryYear) || 'Not set'} mono>
-            <IconButton icon="copy" tone="brass" label="Copy expiry" onPress={() => copy(formatExpiry(card.expiryMonth, card.expiryYear), 'Expiry', ref)} />
+            <IconButton
+              icon="copy"
+              tone="brass"
+              label="Copy expiry"
+              onPress={() => copy(formatExpiry(card.expiryMonth, card.expiryYear), 'Expiry', ref)}
+            />
           </DetailRow>
           <DetailRow label="CVV" value={revealed ? card.cvv || 'Not set' : '•'.repeat(network.cvvLength)} mono>
             <IconButton icon="copy" tone="brass" label="Copy CVV" onPress={() => copy(card.cvv, 'CVV', ref)} />
@@ -141,16 +146,25 @@ export default function CardDetailScreen() {
         onClose={() => setMoreOpen(false)}
         title={title}
         options={[
-          { label: 'Share without secrets', detail: 'Name, last 4 digits and expiry', icon: 'share-2', onPress: () => void shareCard(card) },
+          {
+            label: 'Share without secrets',
+            detail: 'Name, last 4 digits and expiry',
+            icon: 'share-2',
+            onPress: () => void shareCard(card),
+          },
           {
             label: 'Share full details',
             detail: 'Sends the number and CVV in plain text',
             icon: 'alert-triangle',
             onPress: () =>
-              Alert.alert('Share the full card?', 'The number and CVV leave the vault as plain text. Anyone who sees them can pay with this card.', [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Share', style: 'destructive', onPress: () => void shareCard(card, true) },
-              ]),
+              Alert.alert(
+                'Share the full card?',
+                'The number and CVV leave the vault as plain text. Anyone who sees them can pay with this card.',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Share', style: 'destructive', onPress: () => void shareCard(card, true) },
+                ],
+              ),
           },
         ]}
       />

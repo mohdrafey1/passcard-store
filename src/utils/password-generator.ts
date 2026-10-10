@@ -74,10 +74,7 @@ function passwordSets(options: PasswordOptions): string[] {
 /** At least one character from every enabled set, the rest from all of them. */
 export function generatePassword(options: PasswordOptions = DEFAULT_PASSWORD_OPTIONS): string {
   const sets = passwordSets(options);
-  const length = Math.min(
-    PASSWORD_LENGTH_RANGE.max,
-    Math.max(options.length, sets.length, PASSWORD_LENGTH_RANGE.min),
-  );
+  const length = Math.min(PASSWORD_LENGTH_RANGE.max, Math.max(options.length, sets.length, PASSWORD_LENGTH_RANGE.min));
   const all = sets.join('');
   const chars = sets.map(pick);
   while (chars.length < length) chars.push(pick(all));

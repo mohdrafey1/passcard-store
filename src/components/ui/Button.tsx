@@ -46,9 +46,7 @@ export function Button({ label, onPress, variant = 'primary', icon, disabled, lo
       ) : (
         <View style={styles.row}>
           {icon && <Icon name={icon} size={18} color={palette.fg} />}
-          <AppText style={[type.bodyStrong, { color: palette.fg, fontWeight: variant === 'primary' ? '800' : '700' }]}>
-            {label}
-          </AppText>
+          <AppText style={[type.bodyStrong, { color: palette.fg, fontWeight: variant === 'primary' ? '800' : '700' }]}>{label}</AppText>
         </View>
       )}
     </Pressable>

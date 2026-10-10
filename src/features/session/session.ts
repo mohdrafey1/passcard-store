@@ -3,14 +3,7 @@ import { usePasswordStore } from '@/features/passwords/store';
 import { useSettingsStore } from '@/features/settings/store';
 import { clearBackupPassword } from '@/features/import-export/backup-handler';
 import { lockSession, verifySecret, wipeKeys } from '@/security/key-manager';
-import {
-  formatDuration,
-  recordFailure,
-  recordSuccess,
-  resetLockoutState,
-  getLockoutStatus,
-  WIPE_THRESHOLD,
-} from '@/security/lockout';
+import { formatDuration, recordFailure, recordSuccess, resetLockoutState, getLockoutStatus, WIPE_THRESHOLD } from '@/security/lockout';
 import { cardRepository } from '@/storage/card-repository';
 import { deleteDatabase } from '@/storage/database';
 import { passwordRepository } from '@/storage/password-repository';
@@ -83,10 +76,7 @@ export function currentLockoutMessage(): string | null {
  * check (unlocking, or verifying for a re-auth prompt) and returns whether it
  * was correct.
  */
-export async function checkSecretWithLockout(
-  check: () => Promise<boolean>,
-  noun: 'PIN' | 'passphrase',
-): Promise<SecretCheck> {
+export async function checkSecretWithLockout(check: () => Promise<boolean>, noun: 'PIN' | 'passphrase'): Promise<SecretCheck> {
   const before = getLockoutStatus();
   if (before.lockedOut) {
     return { ok: false, message: lockoutMessage(before.remainingSeconds), lockedOut: true, erased: false };

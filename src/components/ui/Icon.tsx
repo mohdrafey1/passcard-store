@@ -14,7 +14,7 @@ const MCI = {
   'shield-alert': 'shield-alert-outline',
   'star-filled': 'star',
   'card-chip': 'integrated-circuit-chip',
-  'sort': 'sort',
+  sort: 'sort',
 } as const;
 
 type MciName = keyof typeof MCI;

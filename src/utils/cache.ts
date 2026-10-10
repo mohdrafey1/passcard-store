@@ -11,10 +11,7 @@ const TEMP_PREFIXES = ['password-', 'card-', 'passcard-'];
 const TEMP_SUFFIXES = ['.csv', '.vaultx', '.txt', '.pcbackup'];
 
 function isTempExportFile(name: string): boolean {
-  return (
-    TEMP_SUFFIXES.some((s) => name.endsWith(s)) ||
-    TEMP_PREFIXES.some((p) => name.startsWith(p))
-  );
+  return TEMP_SUFFIXES.some((s) => name.endsWith(s)) || TEMP_PREFIXES.some((p) => name.startsWith(p));
 }
 
 /**

@@ -45,9 +45,7 @@ export function sanitizeCategories(value: unknown): string[] | null {
 
 export async function loadSettings(): Promise<AppSettings> {
   const entries = await Promise.all(
-    (Object.keys(KEYS) as (keyof AppSettings)[]).map(
-      async (k) => [k, await SecureStore.getItemAsync(KEYS[k]).catch(() => null)] as const,
-    ),
+    (Object.keys(KEYS) as (keyof AppSettings)[]).map(async (k) => [k, await SecureStore.getItemAsync(KEYS[k]).catch(() => null)] as const),
   );
   const raw = Object.fromEntries(entries) as Record<keyof AppSettings, string | null>;
 
@@ -61,8 +59,11 @@ export async function loadSettings(): Promise<AppSettings> {
   }
 
   return {
-    autoLockDuration: pick(raw.autoLockDuration, AUTO_LOCK_OPTIONS, DEFAULT_SETTINGS.autoLockDuration, (s) =>
-      parseInt(s, 10) as AppSettings['autoLockDuration'],
+    autoLockDuration: pick(
+      raw.autoLockDuration,
+      AUTO_LOCK_OPTIONS,
+      DEFAULT_SETTINGS.autoLockDuration,
+      (s) => parseInt(s, 10) as AppSettings['autoLockDuration'],
     ),
     clipboardClearDuration: pick(
       raw.clipboardClearDuration,
@@ -72,8 +73,11 @@ export async function loadSettings(): Promise<AppSettings> {
     ),
     wipeAfterFailures: raw.wipeAfterFailures === 'true',
     theme: pick(raw.theme, THEME_OPTIONS, DEFAULT_SETTINGS.theme, (s) => s as AppSettings['theme']),
-    backupReminder: pick(raw.backupReminder, BACKUP_REMINDER_OPTIONS, DEFAULT_SETTINGS.backupReminder, (s) =>
-      s as AppSettings['backupReminder'],
+    backupReminder: pick(
+      raw.backupReminder,
+      BACKUP_REMINDER_OPTIONS,
+      DEFAULT_SETTINGS.backupReminder,
+      (s) => s as AppSettings['backupReminder'],
     ),
     lastBackupAt: raw.lastBackupAt && !Number.isNaN(Date.parse(raw.lastBackupAt)) ? raw.lastBackupAt : null,
     categories,
@@ -102,8 +106,6 @@ export async function takeLegacyBiometricPreference(): Promise<boolean | null> {
 
 export async function deleteAllSettings(): Promise<void> {
   await Promise.all(
-    [...Object.values(KEYS), LEGACY_BIOMETRICS, LEGACY_PIN_LENGTH].map((key) =>
-      SecureStore.deleteItemAsync(key).catch(() => {}),
-    ),
+    [...Object.values(KEYS), LEGACY_BIOMETRICS, LEGACY_PIN_LENGTH].map((key) => SecureStore.deleteItemAsync(key).catch(() => {})),
   );
 }

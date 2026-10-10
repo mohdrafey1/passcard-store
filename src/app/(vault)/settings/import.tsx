@@ -18,12 +18,50 @@ import { runWithoutAutoLock } from '@/utils/auto-lock-guard';
 import { cleanupTempFile } from '@/utils/cache';
 
 const SOURCES = [
-  { id: 'google', name: 'Google Password Manager', short: 'Google', steps: ['Open Google Password Manager › Settings.', 'Tap Export passwords and confirm.', 'Come back here and choose the downloaded file.'] },
-  { id: 'bitwarden', name: 'Bitwarden', short: 'Bitwarden', steps: ['Open Bitwarden › Settings › Export vault.', 'Choose the .csv format.', 'Choose the file here.'] },
-  { id: '1password', name: '1Password', short: '1Password', steps: ['On a computer, open 1Password › File › Export.', 'Choose CSV and move the file to this phone.', 'Choose the file here.'] },
-  { id: 'lastpass', name: 'LastPass', short: 'LastPass', steps: ['Open LastPass › Advanced options › Export.', 'Save the CSV it creates.', 'Choose the file here.'] },
-  { id: 'keepass', name: 'KeePass or KeePassXC', short: 'KeePass', steps: ['Open the database › Export › CSV file.', 'Move the file to this phone.', 'Choose the file here.'] },
-  { id: 'other', name: 'Another CSV', short: 'CSV', steps: ['Any file with a header row works.', 'Columns are matched by name: title, url, username, email, password, notes.', 'You’ll see what was found before anything is saved.'] },
+  {
+    id: 'google',
+    name: 'Google Password Manager',
+    short: 'Google',
+    steps: [
+      'Open Google Password Manager › Settings.',
+      'Tap Export passwords and confirm.',
+      'Come back here and choose the downloaded file.',
+    ],
+  },
+  {
+    id: 'bitwarden',
+    name: 'Bitwarden',
+    short: 'Bitwarden',
+    steps: ['Open Bitwarden › Settings › Export vault.', 'Choose the .csv format.', 'Choose the file here.'],
+  },
+  {
+    id: '1password',
+    name: '1Password',
+    short: '1Password',
+    steps: ['On a computer, open 1Password › File › Export.', 'Choose CSV and move the file to this phone.', 'Choose the file here.'],
+  },
+  {
+    id: 'lastpass',
+    name: 'LastPass',
+    short: 'LastPass',
+    steps: ['Open LastPass › Advanced options › Export.', 'Save the CSV it creates.', 'Choose the file here.'],
+  },
+  {
+    id: 'keepass',
+    name: 'KeePass or KeePassXC',
+    short: 'KeePass',
+    steps: ['Open the database › Export › CSV file.', 'Move the file to this phone.', 'Choose the file here.'],
+  },
+  {
+    id: 'other',
+    name: 'Another CSV',
+    short: 'CSV',
+    steps: [
+      'Any file with a header row works.',
+      'Columns are matched by name: title, url, username, email, password, notes.',
+      'You’ll see what was found before anything is saved.',
+    ],
+  },
 ] as const;
 
 const LIST_LIMIT = 50;
@@ -43,7 +81,10 @@ export default function ImportScreen() {
   const choose = async () => {
     setError(null);
     const doc = await runWithoutAutoLock(() =>
-      DocumentPicker.getDocumentAsync({ type: ['text/csv', 'text/comma-separated-values', 'text/plain', '*/*'], copyToCacheDirectory: true }),
+      DocumentPicker.getDocumentAsync({
+        type: ['text/csv', 'text/comma-separated-values', 'text/plain', '*/*'],
+        copyToCacheDirectory: true,
+      }),
     );
     if (doc.canceled) return;
     const asset = doc.assets[0];
@@ -79,7 +120,10 @@ export default function ImportScreen() {
     const total = outcome.logins + outcome.cards;
     const title =
       total > 0
-        ? `Imported ${[outcome.logins && `${outcome.logins} login${outcome.logins === 1 ? '' : 's'}`, outcome.cards && `${outcome.cards} card${outcome.cards === 1 ? '' : 's'}`]
+        ? `Imported ${[
+            outcome.logins && `${outcome.logins} login${outcome.logins === 1 ? '' : 's'}`,
+            outcome.cards && `${outcome.cards} card${outcome.cards === 1 ? '' : 's'}`,
+          ]
             .filter(Boolean)
             .join(' and ')}`
         : outcome.duplicates > 0
@@ -94,8 +138,16 @@ export default function ImportScreen() {
           {title}
         </AppText>
         <View style={{ gap: space.xs }}>
-          {outcome.duplicates ? <AppText variant="body" tone="ink2">• {outcome.duplicates} already in your vault, skipped.</AppText> : null}
-          {outcome.skipped ? <AppText variant="body" tone="ink2">• {outcome.skipped === 1 ? '1 note or other non-login item' : `${outcome.skipped} notes or other non-login items`} left out.</AppText> : null}
+          {outcome.duplicates ? (
+            <AppText variant="body" tone="ink2">
+              • {outcome.duplicates} already in your vault, skipped.
+            </AppText>
+          ) : null}
+          {outcome.skipped ? (
+            <AppText variant="body" tone="ink2">
+              • {outcome.skipped === 1 ? '1 note or other non-login item' : `${outcome.skipped} notes or other non-login items`} left out.
+            </AppText>
+          ) : null}
           {outcome.problems.length ? (
             <AppText variant="body" tone="ink2">
               • {outcome.problems.length} row{outcome.problems.length === 1 ? '' : 's'} couldn’t be imported:
@@ -113,7 +165,11 @@ export default function ImportScreen() {
             …and {outcome.problems.length - LIST_LIMIT} more.
           </AppText>
         ) : null}
-        <Banner tone="warn" title="Delete the exported file" body={`${fileName || 'The CSV'} isn’t encrypted. Remove it from Downloads and any cloud folder.`} />
+        <Banner
+          tone="warn"
+          title="Delete the exported file"
+          body={`${fileName || 'The CSV'} isn’t encrypted. Remove it from Downloads and any cloud folder.`}
+        />
         <Button label="Done" onPress={() => router.back()} />
       </ScrollView>
     );
@@ -129,7 +185,11 @@ export default function ImportScreen() {
         <AppText variant="body" tone="ink2">
           Read as a {parsed.formatLabel} file{fileName ? ` (${fileName})` : ''}. Nothing is saved until you confirm.
         </AppText>
-        {parsed.skipped ? <AppText variant="caption" tone="muted">{parsed.skipped === 1 ? '1 note or other non-login item' : `${parsed.skipped} notes or other non-login items`} will be left out.</AppText> : null}
+        {parsed.skipped ? (
+          <AppText variant="caption" tone="muted">
+            {parsed.skipped === 1 ? '1 note or other non-login item' : `${parsed.skipped} notes or other non-login items`} will be left out.
+          </AppText>
+        ) : null}
         {parsed.problems.length ? (
           <Banner
             tone="warn"
@@ -184,17 +244,28 @@ export default function ImportScreen() {
       <AppText variant="body" tone="ink2">
         The file is read on this phone, matched to the right fields, then wiped from the app’s cache.
       </AppText>
-      <View accessibilityRole="radiogroup" accessibilityLabel="Import source" style={[styles.sources, { backgroundColor: c.surface, borderColor: c.line }]}>
+      <View
+        accessibilityRole="radiogroup"
+        accessibilityLabel="Import source"
+        style={[styles.sources, { backgroundColor: c.surface, borderColor: c.line }]}
+      >
         {SOURCES.map((s, i) => {
           const on = s.id === source;
           return (
             <View key={s.id} style={i < SOURCES.length - 1 ? { borderBottomColor: c.line, borderBottomWidth: 1 } : undefined}>
-              <Pressable onPress={() => setSource(s.id)} accessibilityRole="radio" accessibilityState={{ checked: on }} style={styles.sourceRow}>
+              <Pressable
+                onPress={() => setSource(s.id)}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: on }}
+                style={styles.sourceRow}
+              >
                 <Monogram name={s.short} size={32} />
                 <AppText variant="bodyStrong" style={{ flex: 1 }}>
                   {s.name}
                 </AppText>
-                <View style={[styles.radio, { borderColor: on ? c.brass : c.muted }]}>{on ? <View style={[styles.radioDot, { backgroundColor: c.brass }]} /> : null}</View>
+                <View style={[styles.radio, { borderColor: on ? c.brass : c.muted }]}>
+                  {on ? <View style={[styles.radioDot, { backgroundColor: c.brass }]} /> : null}
+                </View>
               </Pressable>
               {on ? (
                 <View style={[styles.steps, { backgroundColor: c.ground }]}>
@@ -224,6 +295,13 @@ const styles = StyleSheet.create({
   radioDot: { width: 10, height: 10, borderRadius: 5 },
   steps: { borderRadius: 12, padding: space.md, gap: 6, marginBottom: space.md },
   preview: { borderWidth: 1, borderRadius: radius.group, overflow: 'hidden' },
-  previewRow: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.md, paddingVertical: space.sm, borderBottomWidth: 1 },
+  previewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.md,
+    paddingHorizontal: space.md,
+    paddingVertical: space.sm,
+    borderBottomWidth: 1,
+  },
   resultIcon: { width: 64, height: 64, borderRadius: 20, alignItems: 'center', justifyContent: 'center', alignSelf: 'center' },
 });

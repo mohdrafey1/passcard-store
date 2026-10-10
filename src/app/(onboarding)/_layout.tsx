@@ -5,7 +5,5 @@ export const unstable_settings = { initialRouteName: 'welcome' };
 
 export default function OnboardingLayout() {
   const c = useTheme();
-  return (
-    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.ground }, animation: 'slide_from_right' }} />
-  );
+  return <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.ground }, animation: 'slide_from_right' }} />;
 }

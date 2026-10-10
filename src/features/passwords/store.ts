@@ -18,8 +18,7 @@ interface PasswordState {
   reset: () => void;
 }
 
-const replace = (list: PasswordEntry[], entry: PasswordEntry) =>
-  list.map((p) => (p.id === entry.id ? entry : p));
+const replace = (list: PasswordEntry[], entry: PasswordEntry) => list.map((p) => (p.id === entry.id ? entry : p));
 
 export const usePasswordStore = create<PasswordState>((set, get) => ({
   passwords: [],

@@ -30,7 +30,12 @@ export function Sheet({ visible, title, subtitle, options, onClose, choice }: Sh
   const insets = useSafeAreaInsets();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
-      <Pressable style={[styles.backdrop, { backgroundColor: c.scrim }]} onPress={onClose} accessibilityLabel="Close" accessibilityRole="button" />
+      <Pressable
+        style={[styles.backdrop, { backgroundColor: c.scrim }]}
+        onPress={onClose}
+        accessibilityLabel="Close"
+        accessibilityRole="button"
+      />
       <View style={[styles.sheet, { backgroundColor: c.surface, borderColor: c.line, paddingBottom: insets.bottom + space.md }]}>
         <View style={[styles.handle, { backgroundColor: c.dotEmpty }]} />
         {title ? (
@@ -97,7 +102,14 @@ const styles = StyleSheet.create({
   },
   handle: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: space.md },
   header: { paddingHorizontal: space.xl, paddingBottom: space.md, gap: 2 },
-  option: { flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 56, paddingHorizontal: space.xl, paddingVertical: space.sm },
+  option: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.md,
+    minHeight: 56,
+    paddingHorizontal: space.xl,
+    paddingVertical: space.sm,
+  },
   optionIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   radioDot: { width: 11, height: 11, borderRadius: 6 },

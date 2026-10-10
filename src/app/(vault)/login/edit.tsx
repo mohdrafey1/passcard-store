@@ -43,7 +43,7 @@ export default function LoginEditScreen() {
       username: existing?.username ?? '',
       email: existing?.email ?? '',
       password: existing?.password ?? '',
-      category: existing?.category ?? (categories.includes('Personal') ? 'Personal' : categories[0] ?? 'Other'),
+      category: existing?.category ?? (categories.includes('Personal') ? 'Personal' : (categories[0] ?? 'Other')),
       favorite: existing?.favorite ?? false,
       notes: existing?.notes ?? '',
     }),
@@ -136,7 +136,14 @@ export default function LoginEditScreen() {
       />
       <KeyboardAvoidingView behavior="height" style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <Field label="Name" value={form.title} onChangeText={(t) => set('title', t)} placeholder="GitHub" autoFocus={!existing} error={errors.title} />
+          <Field
+            label="Name"
+            value={form.title}
+            onChangeText={(t) => set('title', t)}
+            placeholder="GitHub"
+            autoFocus={!existing}
+            error={errors.title}
+          />
           <Field
             label="Website"
             value={form.website}
@@ -146,7 +153,14 @@ export default function LoginEditScreen() {
             autoCorrect={false}
             keyboardType="url"
           />
-          <Field label="Username" value={form.username} onChangeText={(t) => set('username', t)} autoCapitalize="none" autoCorrect={false} placeholder="Optional" />
+          <Field
+            label="Username"
+            value={form.username}
+            onChangeText={(t) => set('username', t)}
+            autoCapitalize="none"
+            autoCorrect={false}
+            placeholder="Optional"
+          />
           <Field
             label="Email"
             value={form.email}
@@ -168,7 +182,12 @@ export default function LoginEditScreen() {
               error={errors.password}
               accessory={
                 <>
-                  <IconButton icon={revealed ? 'eye-off' : 'eye'} label={revealed ? 'Hide password' : 'Show password'} tone="ink2" onPress={() => setRevealed((r) => !r)} />
+                  <IconButton
+                    icon={revealed ? 'eye-off' : 'eye'}
+                    label={revealed ? 'Hide password' : 'Show password'}
+                    tone="ink2"
+                    onPress={() => setRevealed((r) => !r)}
+                  />
                   <IconButton
                     icon="refresh-cw"
                     label="Generate a new password"
@@ -185,7 +204,12 @@ export default function LoginEditScreen() {
               <View style={{ flex: 1 }}>
                 {form.password ? <StrengthMeter score={strength.score} label={strength.label} detail={strength.hint ?? undefined} /> : null}
               </View>
-              <Pressable onPress={() => router.push('/generator?target=form')} accessibilityRole="button" style={styles.genLink} hitSlop={6}>
+              <Pressable
+                onPress={() => router.push('/generator?target=form')}
+                accessibilityRole="button"
+                style={styles.genLink}
+                hitSlop={6}
+              >
                 <Icon name="sparkle" size={16} color={c.brassText} />
                 <AppText variant="label" tone="brass" style={{ fontWeight: '800' }}>
                   Generator options
@@ -224,7 +248,13 @@ export default function LoginEditScreen() {
             </View>
           </View>
 
-          <Field label="Notes" value={form.notes} onChangeText={(t) => set('notes', t)} multiline placeholder="Anything else worth keeping safe" />
+          <Field
+            label="Notes"
+            value={form.notes}
+            onChangeText={(t) => set('notes', t)}
+            multiline
+            placeholder="Anything else worth keeping safe"
+          />
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -248,5 +278,13 @@ const styles = StyleSheet.create({
   strengthLine: { flexDirection: 'row', alignItems: 'center', gap: space.sm, minHeight: 32 },
   genLink: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 32 },
   pair: { flexDirection: 'row', gap: space.sm + 2 },
-  select: { minHeight: 52, borderRadius: radius.field, borderWidth: 1, flexDirection: 'row', alignItems: 'center', paddingLeft: space.lg - 2, paddingRight: space.sm },
+  select: {
+    minHeight: 52,
+    borderRadius: radius.field,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingLeft: space.lg - 2,
+    paddingRight: space.sm,
+  },
 });

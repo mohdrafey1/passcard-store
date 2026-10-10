@@ -73,7 +73,9 @@ export default function RecentlyDeletedScreen() {
       <Stack.Screen
         options={{
           headerRight: () =>
-            items && items.length ? <Button label="Empty" variant="quiet" onPress={emptyAll} style={{ minHeight: 40, paddingHorizontal: space.md }} /> : null,
+            items && items.length ? (
+              <Button label="Empty" variant="quiet" onPress={emptyAll} style={{ minHeight: 40, paddingHorizontal: space.md }} />
+            ) : null,
         }}
       />
       <FlatList
@@ -87,7 +89,15 @@ export default function RecentlyDeletedScreen() {
             </AppText>
           ) : null
         }
-        ListEmptyComponent={items ? <EmptyState icon="trash-2" title="Nothing here" body="Deleted logins and cards stay here for 30 days, so you can bring them back." /> : null}
+        ListEmptyComponent={
+          items ? (
+            <EmptyState
+              icon="trash-2"
+              title="Nothing here"
+              body="Deleted logins and cards stay here for 30 days, so you can bring them back."
+            />
+          ) : null
+        }
         renderItem={({ item }) => {
           const left = RECENTLY_DELETED_DAYS - (daysSince(item.deletedAt) ?? 0);
           return (
@@ -113,5 +123,13 @@ export default function RecentlyDeletedScreen() {
 
 const styles = StyleSheet.create({
   note: { paddingHorizontal: space.xl, paddingVertical: space.md },
-  row: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingLeft: space.xl, paddingRight: space.sm, paddingVertical: space.sm, borderBottomWidth: 1 },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.md,
+    paddingLeft: space.xl,
+    paddingRight: space.sm,
+    paddingVertical: space.sm,
+    borderBottomWidth: 1,
+  },
 });

@@ -260,10 +260,7 @@ export async function applyBackup(payload: BackupPayload, mode: 'replace' | 'mer
     cards = newer(cards, localCards);
   }
 
-  const [sealedPasswords, sealedCards] = await Promise.all([
-    passwordRepository.sealMany(passwords),
-    cardRepository.sealMany(cards),
-  ]);
+  const [sealedPasswords, sealedCards] = await Promise.all([passwordRepository.sealMany(passwords), cardRepository.sealMany(cards)]);
   const db = await getDatabase();
   await db.withTransactionAsync(async () => {
     if (mode === 'replace') {

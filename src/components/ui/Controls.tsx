@@ -71,9 +71,7 @@ export function ChipRow<T extends string>({
             accessibilityState={{ selected: on }}
             style={[
               styles.chip,
-              on
-                ? { backgroundColor: c.brass, borderColor: c.brass }
-                : { backgroundColor: c.surface, borderColor: c.line },
+              on ? { backgroundColor: c.brass, borderColor: c.brass } : { backgroundColor: c.surface, borderColor: c.line },
             ]}
           >
             <AppText variant="label" style={{ color: on ? c.onBrass : c.ink2 }}>
@@ -154,11 +152,7 @@ export function StrengthMeter({ score, label, detail }: { score: 0 | 1 | 2 | 3 |
   const c = useTheme();
   const color = [c.danger, c.danger, c.warn, c.success, c.success][score];
   return (
-    <View
-      style={styles.meter}
-      accessible
-      accessibilityLabel={`Strength: ${label}${detail ? `, ${detail}` : ''}`}
-    >
+    <View style={styles.meter} accessible accessibilityLabel={`Strength: ${label}${detail ? `, ${detail}` : ''}`}>
       <View style={styles.bars}>
         {[1, 2, 3, 4].map((i) => (
           <View key={i} style={[styles.bar, { backgroundColor: i <= score ? color : c.line }]} />

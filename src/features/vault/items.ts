@@ -38,9 +38,7 @@ function haystack(item: VaultItem): string {
     return [p.title, p.website, p.username, p.email, p.category, p.notes].join('\n').toLowerCase();
   }
   const c = item.entry;
-  return [c.cardNickname, c.cardHolderName, c.cardNumber.slice(-4), detectNetwork(c.cardNumber).name, c.notes]
-    .join('\n')
-    .toLowerCase();
+  return [c.cardNickname, c.cardHolderName, c.cardNumber.slice(-4), detectNetwork(c.cardNumber).name, c.notes].join('\n').toLowerCase();
 }
 
 export function filterItems(items: VaultItem[], query: string, filter: VaultFilter): VaultItem[] {

@@ -29,7 +29,12 @@ export default function WelcomeScreen() {
     <Screen edges={['top', 'bottom']}>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.hero}>
-          <Image source={require('@/assets/logo.png')} style={styles.logo} accessibilityIgnoresInvertColors accessibilityLabel="Passcard Store" />
+          <Image
+            source={require('@/assets/logo.png')}
+            style={styles.logo}
+            accessibilityIgnoresInvertColors
+            accessibilityLabel="Passcard Store"
+          />
           <AppText variant="display" align="center" accessibilityRole="header">
             Your passwords and cards, locked to this phone.
           </AppText>
@@ -39,7 +44,10 @@ export default function WelcomeScreen() {
           {PROMISES.map((p, i) => (
             <View
               key={p.title}
-              style={[styles.promise, i < PROMISES.length - 1 && { borderBottomColor: c.line, borderBottomWidth: StyleSheet.hairlineWidth * 2 }]}
+              style={[
+                styles.promise,
+                i < PROMISES.length - 1 && { borderBottomColor: c.line, borderBottomWidth: StyleSheet.hairlineWidth * 2 },
+              ]}
               accessible
               accessibilityLabel={`${p.title}. ${p.body}`}
             >

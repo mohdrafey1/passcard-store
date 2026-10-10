@@ -4,7 +4,8 @@ const CATEGORIES = ['Personal', 'Work', 'Banking', 'Other'];
 
 describe('parseImport', () => {
   it('reads Google Password Manager / Chrome', () => {
-    const csv = 'name,url,username,password,note\nGitHub,https://github.com/login,alexmorgan,s3cret!,\n,https://www.netflix.com/,alex@example.com,pw2,Family plan\n';
+    const csv =
+      'name,url,username,password,note\nGitHub,https://github.com/login,alexmorgan,s3cret!,\n,https://www.netflix.com/,alex@example.com,pw2,Family plan\n';
     const r = parseImport(csv, CATEGORIES);
     expect(r.format).toBe('google');
     expect(r.logins).toHaveLength(2);
@@ -53,7 +54,8 @@ describe('parseImport', () => {
   });
 
   it('reads KeePassXC and KeePass 2', () => {
-    const xc = '"Group","Title","Username","Password","URL","Notes","TOTP","Icon","Last Modified","Created"\n"Root/Banking","HDFC","4471","pw","https://hdfc.com","","","0","",""\n';
+    const xc =
+      '"Group","Title","Username","Password","URL","Notes","TOTP","Icon","Last Modified","Created"\n"Root/Banking","HDFC","4471","pw","https://hdfc.com","","","0","",""\n';
     expect(parseImport(xc).format).toBe('keepassxc');
     const kp = '"Account","Login Name","Password","Web Site","Comments"\n"Spotify","alex","pw","https://spotify.com","music"\n';
     const r = parseImport(kp);

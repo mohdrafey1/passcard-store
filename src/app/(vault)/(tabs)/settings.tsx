@@ -110,7 +110,9 @@ export default function SettingsScreen() {
             icon="shield-alert"
             label={`Erase after ${WIPE_THRESHOLD} tries`}
             detail={`Wipes the vault after ${WIPE_THRESHOLD} wrong attempts in a row`}
-            accessory={<Toggle value={s.wipeAfterFailures} onValueChange={toggleWipe} label={`Erase after ${WIPE_THRESHOLD} wrong attempts`} />}
+            accessory={
+              <Toggle value={s.wipeAfterFailures} onValueChange={toggleWipe} label={`Erase after ${WIPE_THRESHOLD} wrong attempts`} />
+            }
           />
           <Row icon="lock" label="Lock now" tone="brass" chevron={false} onPress={lockVault} />
         </Group>
@@ -182,7 +184,11 @@ export default function SettingsScreen() {
         onClose={() => setPicker(null)}
         title="Theme"
         choice
-        options={THEME_OPTIONS.map((o) => ({ label: o.label, selected: o.value === s.theme, onPress: () => void s.update('theme', o.value) }))}
+        options={THEME_OPTIONS.map((o) => ({
+          label: o.label,
+          selected: o.value === s.theme,
+          onPress: () => void s.update('theme', o.value),
+        }))}
       />
       <ReauthModal
         visible={eraseAuth}

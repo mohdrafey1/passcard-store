@@ -7,9 +7,22 @@ const card = (o: Record<string, unknown>) => normalizeCard({ id: String(o.cardNi
 
 const items = toItems(
   [
-    login({ title: 'GitHub', username: 'alex', category: 'Work', favorite: true, createdAt: '2026-01-01T00:00:00Z', lastUsedAt: '2026-10-01T00:00:00Z' }),
+    login({
+      title: 'GitHub',
+      username: 'alex',
+      category: 'Work',
+      favorite: true,
+      createdAt: '2026-01-01T00:00:00Z',
+      lastUsedAt: '2026-10-01T00:00:00Z',
+    }),
     login({ title: 'amazon', email: 'a@x.com', category: 'Shopping', createdAt: '2026-05-01T00:00:00Z' }),
-    login({ title: 'Netflix', notes: 'family plan', category: 'Personal', createdAt: '2026-03-01T00:00:00Z', lastUsedAt: '2026-09-01T00:00:00Z' }),
+    login({
+      title: 'Netflix',
+      notes: 'family plan',
+      category: 'Personal',
+      createdAt: '2026-03-01T00:00:00Z',
+      lastUsedAt: '2026-09-01T00:00:00Z',
+    }),
   ],
   [card({ cardNickname: 'Regalia', cardNumber: '4111111111114471', createdAt: '2026-08-01T00:00:00Z' })],
 );
@@ -35,7 +48,11 @@ describe('sortItems', () => {
     expect(sortItems(items, 'name').map((i) => i.title)).toEqual(['amazon', 'GitHub', 'Netflix', 'Regalia']);
   });
   it('puts recently used first, never-used last', () => {
-    expect(sortItems(items, 'used').map((i) => i.title).slice(0, 2)).toEqual(['GitHub', 'Netflix']);
+    expect(
+      sortItems(items, 'used')
+        .map((i) => i.title)
+        .slice(0, 2),
+    ).toEqual(['GitHub', 'Netflix']);
   });
   it('puts recently added first', () => {
     expect(sortItems(items, 'added')[0].title).toBe('Regalia');

@@ -70,10 +70,7 @@ export default function SetupScreen() {
                 accessibilityRole="radio"
                 accessibilityState={{ checked: on }}
                 accessibilityLabel={`${o.title}. ${o.body}${o.tag ? ` ${o.tag}` : ''}`}
-                style={[
-                  styles.option,
-                  { backgroundColor: c.surface, borderColor: on ? c.brass : c.line, borderWidth: on ? 2 : 1 },
-                ]}
+                style={[styles.option, { backgroundColor: c.surface, borderColor: on ? c.brass : c.line, borderWidth: on ? 2 : 1 }]}
               >
                 <View style={[styles.radio, { borderColor: on ? c.brass : c.muted }]}>
                   {on ? <View style={[styles.radioDot, { backgroundColor: c.brass }]} /> : null}
@@ -109,11 +106,7 @@ export default function SetupScreen() {
           </View>
         ) : null}
 
-        <Banner
-          tone="warn"
-          title="There's no “Forgot PIN”"
-          body="Make an encrypted backup once you're in. We'll remind you every month."
-        />
+        <Banner tone="warn" title="There's no “Forgot PIN”" body="Make an encrypted backup once you're in. We'll remind you every month." />
       </ScrollView>
       <View style={styles.footer}>
         <Button label="Continue" onPress={() => router.push('/create-secret')} />

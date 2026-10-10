@@ -3,17 +3,7 @@
  * grouping, and expiry. Pure functions; card data never leaves the device.
  */
 
-export type NetworkId =
-  | 'visa'
-  | 'mastercard'
-  | 'amex'
-  | 'rupay'
-  | 'discover'
-  | 'diners'
-  | 'jcb'
-  | 'unionpay'
-  | 'maestro'
-  | 'unknown';
+export type NetworkId = 'visa' | 'mastercard' | 'amex' | 'rupay' | 'discover' | 'diners' | 'jcb' | 'unionpay' | 'maestro' | 'unknown';
 
 export interface CardNetwork {
   id: NetworkId;

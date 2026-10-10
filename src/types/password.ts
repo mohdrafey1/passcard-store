@@ -20,8 +20,7 @@ export interface PasswordEntry {
 export type PasswordFormData = Omit<PasswordEntry, 'id' | 'createdAt' | 'updatedAt'>;
 
 const str = (v: unknown): string => (typeof v === 'string' ? v : v == null ? '' : String(v));
-const isoOrNull = (v: unknown): string | null =>
-  typeof v === 'string' && !Number.isNaN(Date.parse(v)) ? v : null;
+const isoOrNull = (v: unknown): string | null => (typeof v === 'string' && !Number.isNaN(Date.parse(v)) ? v : null);
 
 /**
  * Coerce anything read from storage, a backup or an import into a complete

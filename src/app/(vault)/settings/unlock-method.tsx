@@ -71,16 +71,14 @@ export default function UnlockMethodScreen() {
   };
 
   const onPhrase = () => {
-    const problem = weakPassphraseReason(phrase) ?? (strength.score < 2 ? strength.hint ?? 'Too easy to guess. Add more words.' : null);
+    const problem = weakPassphraseReason(phrase) ?? (strength.score < 2 ? (strength.hint ?? 'Too easy to guess. Add more words.') : null);
     if (problem) return setError(problem);
     if (phrase !== phrase2) return setError("Those passphrases don't match.");
     void save(phrase);
   };
 
   if (!verified) {
-    return (
-      <ReauthModal visible reason="change how you unlock" onVerified={() => setVerified(true)} onClose={() => router.back()} />
-    );
+    return <ReauthModal visible reason="change how you unlock" onVerified={() => setVerified(true)} onClose={() => router.back()} />;
   }
 
   if (!choice) {
@@ -106,7 +104,11 @@ export default function UnlockMethodScreen() {
                 <View style={{ flex: 1, gap: 2 }}>
                   <AppText variant="bodyStrong">
                     {o.title}
-                    {isCurrent ? <AppText variant="caption" tone="muted">{'  '}current</AppText> : null}
+                    {isCurrent ? (
+                      <AppText variant="caption" tone="muted">
+                        {'  '}current
+                      </AppText>
+                    ) : null}
                   </AppText>
                   <AppText variant="caption" tone="ink2" style={{ fontSize: 14, fontWeight: '500' }}>
                     {o.body}
@@ -139,7 +141,15 @@ export default function UnlockMethodScreen() {
   return (
     <KeyboardAvoidingView behavior="height" style={{ flex: 1 }}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Field label="New passphrase" value={phrase} onChangeText={setPhrase} secureTextEntry autoFocus autoCapitalize="none" autoCorrect={false} />
+        <Field
+          label="New passphrase"
+          value={phrase}
+          onChangeText={setPhrase}
+          secureTextEntry
+          autoFocus
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
         {phrase ? <StrengthMeter score={strength.score} label={strength.label} detail={strength.hint ?? undefined} /> : null}
         <Field
           label="Type it again"

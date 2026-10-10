@@ -62,14 +62,20 @@ export default function VaultScreen() {
 
   const open = (item: VaultItem) => router.push(item.kind === 'login' ? `/login/${item.id}` : `/card/${item.id}`);
   const copyMain = (item: VaultItem) =>
-    item.kind === 'login'
-      ? copy(item.entry.password, 'Password', item)
-      : copy(item.entry.cardNumber, 'Card number', item);
+    item.kind === 'login' ? copy(item.entry.password, 'Password', item) : copy(item.entry.cardNumber, 'Card number', item);
 
   const menuOptions = (item: VaultItem): SheetOption[] => {
     const common: SheetOption[] = [
-      { label: item.entry.favorite ? 'Remove from favourites' : 'Add to favourites', icon: 'star', onPress: () => void toggleFavorite(item) },
-      { label: 'Edit', icon: 'edit-2', onPress: () => router.push(item.kind === 'login' ? `/login/edit?id=${item.id}` : `/card/edit?id=${item.id}`) },
+      {
+        label: item.entry.favorite ? 'Remove from favourites' : 'Add to favourites',
+        icon: 'star',
+        onPress: () => void toggleFavorite(item),
+      },
+      {
+        label: 'Edit',
+        icon: 'edit-2',
+        onPress: () => router.push(item.kind === 'login' ? `/login/edit?id=${item.id}` : `/card/edit?id=${item.id}`),
+      },
       { label: 'Delete', icon: 'trash-2', destructive: true, onPress: () => void deleteWithUndo(item, item.title) },
     ];
     if (item.kind === 'login') {
@@ -180,7 +186,11 @@ export default function VaultScreen() {
         )}
         ListEmptyComponent={
           all.length === 0 ? (
-            <EmptyState icon="key" title="Your vault is empty" body="Add a login or card, or bring everything over from another password manager.">
+            <EmptyState
+              icon="key"
+              title="Your vault is empty"
+              body="Add a login or card, or bring everything over from another password manager."
+            >
               <Button label="Add a login" icon="plus" onPress={() => router.push('/login/edit')} />
               <Button label="Import from another app" variant="secondary" onPress={() => router.push('/settings/import')} />
             </EmptyState>
@@ -215,7 +225,11 @@ export default function VaultScreen() {
         onClose={() => setSortOpen(false)}
         title="Sort by"
         choice
-        options={(Object.keys(SORT_LABELS) as SortMode[]).map((m) => ({ label: SORT_LABELS[m], selected: m === sort, onPress: () => setSort(m) }))}
+        options={(Object.keys(SORT_LABELS) as SortMode[]).map((m) => ({
+          label: SORT_LABELS[m],
+          selected: m === sort,
+          onPress: () => setSort(m),
+        }))}
       />
       <Sheet
         visible={addOpen}
@@ -240,9 +254,28 @@ export default function VaultScreen() {
 const styles = StyleSheet.create({
   header: { paddingHorizontal: space.xl, paddingTop: space.lg, gap: space.md + 2, paddingBottom: space.sm },
   titleRow: { flexDirection: 'row', alignItems: 'center', minHeight: 48 },
-  search: { flexDirection: 'row', alignItems: 'center', gap: space.sm + 2, minHeight: 50, borderRadius: radius.field, borderWidth: 1, paddingLeft: space.lg - 2, paddingRight: space.xs },
+  search: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm + 2,
+    minHeight: 50,
+    borderRadius: radius.field,
+    borderWidth: 1,
+    paddingLeft: space.lg - 2,
+    paddingRight: space.xs,
+  },
   searchInput: { flex: 1, fontFamily: FONT, fontSize: 16, fontWeight: '500', paddingVertical: space.md },
   listHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: space.xs },
   sortButton: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 32 },
-  fab: { position: 'absolute', right: space.xl, bottom: space.xl, width: 58, height: 58, borderRadius: 18, alignItems: 'center', justifyContent: 'center', elevation: 4 },
+  fab: {
+    position: 'absolute',
+    right: space.xl,
+    bottom: space.xl,
+    width: 58,
+    height: 58,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 4,
+  },
 });

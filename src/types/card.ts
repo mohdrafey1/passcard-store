@@ -23,8 +23,7 @@ export interface CardEntry {
 export type CardFormData = Omit<CardEntry, 'id' | 'createdAt' | 'updatedAt'>;
 
 const str = (v: unknown): string => (typeof v === 'string' ? v : v == null ? '' : String(v));
-const isoOrNull = (v: unknown): string | null =>
-  typeof v === 'string' && !Number.isNaN(Date.parse(v)) ? v : null;
+const isoOrNull = (v: unknown): string | null => (typeof v === 'string' && !Number.isNaN(Date.parse(v)) ? v : null);
 
 /** Coerce a stored, restored or imported card into a complete entry. */
 export function normalizeCard(raw: unknown): CardEntry | null {

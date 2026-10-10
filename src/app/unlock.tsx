@@ -192,9 +192,7 @@ export default function UnlockScreen() {
               error={error}
             />
             <Button label="Unlock" onPress={() => submit(passphrase)} loading={busy} />
-            {biometricsEnabled ? (
-              <Button label="Use fingerprint" variant="secondary" icon="fingerprint" onPress={handleBiometric} />
-            ) : null}
+            {biometricsEnabled ? <Button label="Use fingerprint" variant="secondary" icon="fingerprint" onPress={handleBiometric} /> : null}
           </View>
         </KeyboardAvoidingView>
       )}

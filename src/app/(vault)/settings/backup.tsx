@@ -112,7 +112,9 @@ export default function BackupScreen() {
 
   const pickFile = async () => {
     setRestoreError(null);
-    const doc = await runWithoutAutoLock(() => DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: true, multiple: false }));
+    const doc = await runWithoutAutoLock(() =>
+      DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: true, multiple: false }),
+    );
     if (doc.canceled) return;
     const asset = doc.assets[0];
     try {
@@ -145,7 +147,9 @@ export default function BackupScreen() {
         (changed || restoreMode === 'replace'
           ? `${counted(result.passwords, 'login')} and ${counted(result.cards, 'card')} ${restoreMode === 'merge' ? 'added or updated' : 'restored'}.`
           : 'Everything in the backup is already in this vault.') +
-          (result.keptNewer ? ` Kept ${counted(result.keptNewer, 'item')} from this phone because ${result.keptNewer === 1 ? 'it was' : 'they were'} edited more recently.` : ''),
+          (result.keptNewer
+            ? ` Kept ${counted(result.keptNewer, 'item')} from this phone because ${result.keptNewer === 1 ? 'it was' : 'they were'} edited more recently.`
+            : ''),
       );
     } catch (e) {
       Alert.alert('Restore failed', e instanceof Error ? e.message : 'Nothing was changed.');
@@ -172,10 +176,16 @@ export default function BackupScreen() {
     Alert.alert(
       restoreMode === 'merge' ? 'Merge this backup?' : 'Replace everything?',
       `The backup${when} has ${counted(payload.passwords.length, 'login')} and ${counted(payload.cards.length, 'card')}.` +
-        (restoreMode === 'replace' ? ' Everything currently in this vault is removed first.' : ' Items you edited more recently on this phone are kept.'),
+        (restoreMode === 'replace'
+          ? ' Everything currently in this vault is removed first.'
+          : ' Items you edited more recently on this phone are kept.'),
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: restoreMode === 'merge' ? 'Merge' : 'Replace', style: restoreMode === 'replace' ? 'destructive' : 'default', onPress: () => void apply(payload) },
+        {
+          text: restoreMode === 'merge' ? 'Merge' : 'Replace',
+          style: restoreMode === 'replace' ? 'destructive' : 'default',
+          onPress: () => void apply(payload),
+        },
       ],
     );
   };
@@ -188,8 +198,8 @@ export default function BackupScreen() {
             {hasPassword ? 'New backup password' : 'Set a backup password'}
           </AppText>
           <AppText variant="body" tone="ink2">
-            Backups are locked with this password, not your PIN. You&apos;ll need it to restore on a new phone, so keep it somewhere other than
-            this phone. Nobody can recover it for you.
+            Backups are locked with this password, not your PIN. You&apos;ll need it to restore on a new phone, so keep it somewhere other
+            than this phone. Nobody can recover it for you.
           </AppText>
           <Field
             label="Backup password"
@@ -241,7 +251,11 @@ export default function BackupScreen() {
               {file.name}
             </AppText>
           </View>
-          <View accessibilityRole="radiogroup" accessibilityLabel="Restore mode" style={[styles.radioGroup, { backgroundColor: c.surface, borderColor: c.line }]}>
+          <View
+            accessibilityRole="radiogroup"
+            accessibilityLabel="Restore mode"
+            style={[styles.radioGroup, { backgroundColor: c.surface, borderColor: c.line }]}
+          >
             {(
               [
                 ['merge', 'Merge with this vault', 'Adds what’s missing; keeps whichever copy was edited last'],
@@ -257,7 +271,9 @@ export default function BackupScreen() {
                   accessibilityState={{ checked: on }}
                   style={[styles.radioRow, i === 0 && { borderBottomColor: c.line, borderBottomWidth: 1 }]}
                 >
-                  <View style={[styles.radio, { borderColor: on ? c.brass : c.muted }]}>{on ? <View style={[styles.radioDot, { backgroundColor: c.brass }]} /> : null}</View>
+                  <View style={[styles.radio, { borderColor: on ? c.brass : c.muted }]}>
+                    {on ? <View style={[styles.radioDot, { backgroundColor: c.brass }]} /> : null}
+                  </View>
                   <View style={{ flex: 1 }}>
                     <AppText variant="bodyStrong">{title}</AppText>
                     <AppText variant="caption" tone="muted">

@@ -7,10 +7,7 @@ import * as SecureStore from 'expo-secure-store';
  */
 export async function isBiometricAvailable(): Promise<boolean> {
   try {
-    const [hasHardware, isEnrolled] = await Promise.all([
-      LocalAuthentication.hasHardwareAsync(),
-      LocalAuthentication.isEnrolledAsync(),
-    ]);
+    const [hasHardware, isEnrolled] = await Promise.all([LocalAuthentication.hasHardwareAsync(), LocalAuthentication.isEnrolledAsync()]);
     return hasHardware && isEnrolled && SecureStore.canUseBiometricAuthentication();
   } catch {
     return false;

@@ -137,7 +137,11 @@ export default function RootLayout() {
   if (bootError) {
     content = (
       <View style={[styles.center, { backgroundColor: c.ground }]}>
-        <EmptyState icon="alert-triangle" title="The vault couldn't open" body="Nothing was changed. Try again; if it keeps happening, restart your phone.">
+        <EmptyState
+          icon="alert-triangle"
+          title="The vault couldn't open"
+          body="Nothing was changed. Try again; if it keeps happening, restart your phone."
+        >
           <Button label="Try again" onPress={boot} />
         </EmptyState>
       </View>
@@ -171,5 +175,12 @@ const styles = StyleSheet.create({
     borderRadius: radius.field,
     borderWidth: 1,
   },
-  bannerButton: { minHeight: 40, minWidth: 92, paddingHorizontal: space.lg, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  bannerButton: {
+    minHeight: 40,
+    minWidth: 92,
+    paddingHorizontal: space.lg,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

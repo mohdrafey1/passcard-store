@@ -26,7 +26,21 @@ import {
 
 type Mode = 'random' | 'passphrase' | 'pin';
 
-function Stepper({ label, value, min, max, onChange, unit }: { label: string; value: number; min: number; max: number; onChange: (n: number) => void; unit: string }) {
+function Stepper({
+  label,
+  value,
+  min,
+  max,
+  onChange,
+  unit,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  onChange: (n: number) => void;
+  unit: string;
+}) {
   const c = useTheme();
   return (
     <View style={[styles.optionRow, { borderBottomColor: c.divider }]}>
@@ -43,7 +57,9 @@ function Stepper({ label, value, min, max, onChange, unit }: { label: string; va
         onAccessibilityAction={(e) => onChange(Math.min(max, Math.max(min, value + (e.nativeEvent.actionName === 'increment' ? 1 : -1))))}
       >
         <IconButton icon="minus" label={`Fewer ${unit}`} onPress={() => onChange(Math.max(min, value - 1))} disabled={value <= min} />
-        <AppText style={{ fontFamily: MONO, fontWeight: '600', fontSize: 17, minWidth: 34, textAlign: 'center', color: c.ink }}>{value}</AppText>
+        <AppText style={{ fontFamily: MONO, fontWeight: '600', fontSize: 17, minWidth: 34, textAlign: 'center', color: c.ink }}>
+          {value}
+        </AppText>
         <IconButton icon="plus" label={`More ${unit}`} onPress={() => onChange(Math.min(max, value + 1))} disabled={value >= max} />
       </View>
     </View>
@@ -86,11 +102,11 @@ export default function GeneratorScreen() {
     return generatePin(pinLength);
   }, [mode, pw, phrase, pinLength, nonce]);
 
-  const bits = mode === 'random' ? passwordEntropyBits(pw) : mode === 'passphrase' ? passphraseEntropyBits(phrase) : pinLength * Math.log2(10);
+  const bits =
+    mode === 'random' ? passwordEntropyBits(pw) : mode === 'passphrase' ? passphraseEntropyBits(phrase) : pinLength * Math.log2(10);
   const score = scoreFromEntropy(bits);
   const noun = mode === 'passphrase' ? 'passphrase' : mode === 'pin' ? 'PIN' : 'password';
-  const detail =
-    mode === 'random' ? `${pw.length} characters` : mode === 'passphrase' ? `${phrase.words} words` : `${pinLength} digits`;
+  const detail = mode === 'random' ? `${pw.length} characters` : mode === 'passphrase' ? `${phrase.words} words` : `${pinLength} digits`;
 
   const finish = useCallback(() => {
     if (toForm) deliver(value);
@@ -160,7 +176,12 @@ export default function GeneratorScreen() {
               <Switch label="Lowercase" hint="a–z" value={pw.lowercase} onChange={(v) => setPwOption('lowercase', v)} />
               <Switch label="Numbers" hint="0–9" value={pw.numbers} onChange={(v) => setPwOption('numbers', v)} />
               <Switch label="Symbols" hint="!@#$" value={pw.symbols} onChange={(v) => setPwOption('symbols', v)} />
-              <Switch label="Avoid look-alikes" hint="l 1 O 0" value={pw.avoidLookAlikes} onChange={(v) => setPwOption('avoidLookAlikes', v)} />
+              <Switch
+                label="Avoid look-alikes"
+                hint="l 1 O 0"
+                value={pw.avoidLookAlikes}
+                onChange={(v) => setPwOption('avoidLookAlikes', v)}
+              />
             </>
           ) : mode === 'passphrase' ? (
             <>
@@ -172,8 +193,18 @@ export default function GeneratorScreen() {
                 max={PASSPHRASE_WORDS_RANGE.max}
                 onChange={(n) => setPhrase((p) => ({ ...p, words: n }))}
               />
-              <Switch label="Capitalise" hint="Copper" value={phrase.capitalize} onChange={(v) => setPhrase((p) => ({ ...p, capitalize: v }))} />
-              <Switch label="Add a number" hint="Copper7" value={phrase.includeNumber} onChange={(v) => setPhrase((p) => ({ ...p, includeNumber: v }))} />
+              <Switch
+                label="Capitalise"
+                hint="Copper"
+                value={phrase.capitalize}
+                onChange={(v) => setPhrase((p) => ({ ...p, capitalize: v }))}
+              />
+              <Switch
+                label="Add a number"
+                hint="Copper7"
+                value={phrase.includeNumber}
+                onChange={(v) => setPhrase((p) => ({ ...p, includeNumber: v }))}
+              />
               <Switch
                 label="Separate with spaces"
                 hint="instead of -"
@@ -182,7 +213,14 @@ export default function GeneratorScreen() {
               />
             </>
           ) : (
-            <Stepper label="Length" unit="digits" value={pinLength} min={PIN_LENGTH_RANGE.min} max={PIN_LENGTH_RANGE.max} onChange={setPinLength} />
+            <Stepper
+              label="Length"
+              unit="digits"
+              value={pinLength}
+              min={PIN_LENGTH_RANGE.min}
+              max={PIN_LENGTH_RANGE.max}
+              onChange={setPinLength}
+            />
           )}
         </View>
       </ScrollView>
@@ -197,7 +235,15 @@ const styles = StyleSheet.create({
   sheet: { flex: 1, paddingTop: space.md },
   titleRow: { flexDirection: 'row', alignItems: 'center', paddingLeft: space.xl, paddingRight: space.sm },
   content: { paddingHorizontal: space.xl, gap: space.md + 2, paddingBottom: space.xl },
-  output: { flexDirection: 'row', alignItems: 'center', borderRadius: radius.group - 2, paddingLeft: space.lg + 2, paddingRight: space.xs, paddingVertical: space.sm, minHeight: 104 },
+  output: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: radius.group - 2,
+    paddingLeft: space.lg + 2,
+    paddingRight: space.xs,
+    paddingVertical: space.sm,
+    minHeight: 104,
+  },
   outputText: { flex: 1, fontFamily: MONO, fontWeight: '600', fontSize: 21, lineHeight: 30, letterSpacing: 0.5 },
   optionRow: { flexDirection: 'row', alignItems: 'center', minHeight: 54, borderBottomWidth: 1, gap: space.sm },
   stepper: { flexDirection: 'row', alignItems: 'center' },

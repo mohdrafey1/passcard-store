@@ -17,10 +17,7 @@ interface FieldProps extends Omit<TextInputProps, 'style'> {
  * system (e.g. Google Password Manager) never offers to save what's typed
  * here. Height grows with the font size instead of being fixed.
  */
-export const Field = forwardRef<TextInput, FieldProps>(function Field(
-  { label, error, hint, mono, accessory, multiline, ...input },
-  ref,
-) {
+export const Field = forwardRef<TextInput, FieldProps>(function Field({ label, error, hint, mono, accessory, multiline, ...input }, ref) {
   const c = useTheme();
   const [focused, setFocused] = useState(false);
   const borderColor = error ? c.danger : focused ? c.brass : c.line;

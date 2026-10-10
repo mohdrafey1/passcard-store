@@ -115,11 +115,7 @@ export class EncryptedRepository<T extends BaseEntity> {
     } as T;
     const db = await getDatabase();
     const sealed = await encryptRecord(JSON.stringify(updated), this.aad(id));
-    await db.runAsync(`UPDATE ${this.table} SET encrypted_data = ?, updated_at = ? WHERE id = ?`, [
-      sealed,
-      updated.updatedAt,
-      id,
-    ]);
+    await db.runAsync(`UPDATE ${this.table} SET encrypted_data = ?, updated_at = ? WHERE id = ?`, [sealed, updated.updatedAt, id]);
     return updated;
   }
 
@@ -150,9 +146,7 @@ export class EncryptedRepository<T extends BaseEntity> {
   async purgeDeleted(olderThan?: Date): Promise<void> {
     const db = await getDatabase();
     if (olderThan) {
-      await db.runAsync(`DELETE FROM ${this.table} WHERE deleted_at IS NOT NULL AND deleted_at < ?`, [
-        olderThan.toISOString(),
-      ]);
+      await db.runAsync(`DELETE FROM ${this.table} WHERE deleted_at IS NOT NULL AND deleted_at < ?`, [olderThan.toISOString()]);
     } else {
       await db.runAsync(`DELETE FROM ${this.table} WHERE deleted_at IS NOT NULL`);
     }
@@ -160,17 +154,13 @@ export class EncryptedRepository<T extends BaseEntity> {
 
   async countDeleted(): Promise<number> {
     const db = await getDatabase();
-    const result = await db.getFirstAsync<{ count: number }>(
-      `SELECT COUNT(*) as count FROM ${this.table} WHERE deleted_at IS NOT NULL`,
-    );
+    const result = await db.getFirstAsync<{ count: number }>(`SELECT COUNT(*) as count FROM ${this.table} WHERE deleted_at IS NOT NULL`);
     return result?.count ?? 0;
   }
 
   async count(): Promise<number> {
     const db = await getDatabase();
-    const result = await db.getFirstAsync<{ count: number }>(
-      `SELECT COUNT(*) as count FROM ${this.table} WHERE deleted_at IS NULL`,
-    );
+    const result = await db.getFirstAsync<{ count: number }>(`SELECT COUNT(*) as count FROM ${this.table} WHERE deleted_at IS NULL`);
     return result?.count ?? 0;
   }
 
@@ -195,9 +185,7 @@ export class EncryptedRepository<T extends BaseEntity> {
 
   /** Pre-seal records for `writeSealedTx` so a multi-table transaction stays short. */
   async sealMany(items: T[]): Promise<{ item: T; data: string }[]> {
-    return Promise.all(
-      items.map(async (item) => ({ item, data: await encryptRecord(JSON.stringify(item), this.aad(item.id)) })),
-    );
+    return Promise.all(items.map(async (item) => ({ item, data: await encryptRecord(JSON.stringify(item), this.aad(item.id)) })));
   }
 
   async writeSealedTx(db: SQLiteDatabase, sealed: { item: T; data: string }[]): Promise<void> {
@@ -220,16 +208,14 @@ export class EncryptedRepository<T extends BaseEntity> {
    */
   async migrateLegacyRows(): Promise<number> {
     const db = await getDatabase();
-    const rows = await db.getAllAsync<Row>(
-      `SELECT id, encrypted_data FROM ${this.table} WHERE encrypted_data NOT LIKE 'g1:%'`,
-    );
+    const rows = await db.getAllAsync<Row>(`SELECT id, encrypted_data FROM ${this.table} WHERE encrypted_data NOT LIKE 'g1:%'`);
     const blankColumns = LEGACY_SEARCH_COLUMNS[this.table].map((c) => `${c} = ''`).join(', ');
     if (rows.length === 0) {
       // Earlier partial runs may have re-sealed rows; make sure no plaintext
       // search data remains either way.
-      await db.runAsync(`UPDATE ${this.table} SET ${blankColumns} WHERE ${LEGACY_SEARCH_COLUMNS[this.table]
-        .map((c) => `${c} != ''`)
-        .join(' OR ')}`);
+      await db.runAsync(
+        `UPDATE ${this.table} SET ${blankColumns} WHERE ${LEGACY_SEARCH_COLUMNS[this.table].map((c) => `${c} != ''`).join(' OR ')}`,
+      );
       return 0;
     }
 

@@ -7,17 +7,13 @@ import { Icon, type IconName } from './Icon';
 
 // ---- Screen ----
 
-export function Screen({
-  children,
-  edges = ['top'],
-  style,
-}: {
-  children: React.ReactNode;
-  edges?: Edge[];
-  style?: StyleProp<ViewStyle>;
-}) {
+export function Screen({ children, edges = ['top'], style }: { children: React.ReactNode; edges?: Edge[]; style?: StyleProp<ViewStyle> }) {
   const c = useTheme();
-  return <SafeAreaView edges={edges} style={[{ flex: 1, backgroundColor: c.ground }, style]}>{children}</SafeAreaView>;
+  return (
+    <SafeAreaView edges={edges} style={[{ flex: 1, backgroundColor: c.ground }, style]}>
+      {children}
+    </SafeAreaView>
+  );
 }
 
 // ---- Grouped section ----
@@ -84,7 +80,11 @@ export function Row({ label, icon, value, detail, onPress, accessory, tone = 'de
         ) : null}
       </View>
       {value ? (
-        <AppText variant="caption" style={{ color: valueColor, maxWidth: '45%', fontWeight: tone === 'warn' ? '700' : '600' }} numberOfLines={1}>
+        <AppText
+          variant="caption"
+          style={{ color: valueColor, maxWidth: '45%', fontWeight: tone === 'warn' ? '700' : '600' }}
+          numberOfLines={1}
+        >
           {value}
         </AppText>
       ) : null}
@@ -92,7 +92,12 @@ export function Row({ label, icon, value, detail, onPress, accessory, tone = 'de
       {chevron && <Icon name="chevron-right" size={18} color={c.muted} />}
     </View>
   );
-  if (!onPress) return <View accessible={!accessory} accessibilityLabel={value ? `${label}, ${value}` : label}>{content}</View>;
+  if (!onPress)
+    return (
+      <View accessible={!accessory} accessibilityLabel={value ? `${label}, ${value}` : label}>
+        {content}
+      </View>
+    );
   return (
     <Pressable
       onPress={onPress}
@@ -127,7 +132,12 @@ export function DetailRow({
         <AppText variant="caption" tone="muted">
           {label}
         </AppText>
-        <AppText variant={mono ? 'mono' : 'body'} tone={muted ? 'muted' : 'ink'} style={{ fontWeight: mono ? '500' : '600' }} selectable={false}>
+        <AppText
+          variant={mono ? 'mono' : 'body'}
+          tone={muted ? 'muted' : 'ink'}
+          style={{ fontWeight: mono ? '500' : '600' }}
+          selectable={false}
+        >
           {value}
         </AppText>
       </View>
@@ -179,9 +189,21 @@ export function Banner({
       ) : null}
     </View>
   );
-  if (!onPress) return <View accessible accessibilityRole="text">{inner}</View>;
+  if (!onPress)
+    return (
+      <View accessible accessibilityRole="text">
+        {inner}
+      </View>
+    );
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={[title, body, action].filter(Boolean).map((part) => String(part).replace(/[.\s]+$/, '')).join('. ')}>
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={[title, body, action]
+        .filter(Boolean)
+        .map((part) => String(part).replace(/[.\s]+$/, ''))
+        .join('. ')}
+    >
       {inner}
     </Pressable>
   );
@@ -198,7 +220,11 @@ export function Monogram({ name, size = 42 }: { name: string; size?: number }) {
       importantForAccessibility="no-hide-descendants"
       style={{ width: size, height: size, borderRadius: size * 0.29, backgroundColor: bg, alignItems: 'center', justifyContent: 'center' }}
     >
-      <AppText variant="headline" style={{ color: fg, fontSize: size * 0.43, lineHeight: size * 0.55, fontWeight: '800' }} maxFontSizeMultiplier={1.2}>
+      <AppText
+        variant="headline"
+        style={{ color: fg, fontSize: size * 0.43, lineHeight: size * 0.55, fontWeight: '800' }}
+        maxFontSizeMultiplier={1.2}
+      >
         {monogramLetter(name)}
       </AppText>
     </View>
@@ -207,17 +233,7 @@ export function Monogram({ name, size = 42 }: { name: string; size?: number }) {
 
 // ---- Empty state ----
 
-export function EmptyState({
-  icon,
-  title,
-  body,
-  children,
-}: {
-  icon: IconName;
-  title: string;
-  body?: string;
-  children?: React.ReactNode;
-}) {
+export function EmptyState({ icon, title, body, children }: { icon: IconName; title: string; body?: string; children?: React.ReactNode }) {
   const c = useTheme();
   return (
     <View style={styles.empty}>
@@ -249,6 +265,14 @@ const styles = StyleSheet.create({
   detailText: { flex: 1, minWidth: 0, gap: 2 },
   banner: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md + 2, borderRadius: radius.field, borderWidth: 1 },
   empty: { alignItems: 'center', gap: space.md, paddingHorizontal: space.xxl, paddingVertical: space.huge },
-  emptyIcon: { width: 72, height: 72, borderRadius: 22, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginBottom: space.sm },
+  emptyIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: 22,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: space.sm,
+  },
   emptyActions: { alignSelf: 'stretch', gap: space.sm, marginTop: space.md },
 });

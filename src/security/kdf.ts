@@ -13,8 +13,7 @@ import { base64ToBytes, bytesToBase64, utf8Encode } from './bytes';
  */
 
 export type KdfParams =
-  | { alg: 'argon2id'; salt: string; m: number; t: number; p: number }
-  | { alg: 'pbkdf2-sha256'; salt: string; iter: number };
+  { alg: 'argon2id'; salt: string; m: number; t: number; p: number } | { alg: 'pbkdf2-sha256'; salt: string; iter: number };
 
 /** OWASP Password Storage Cheat Sheet minimums for Argon2id (19 MiB, t=2, p=1). */
 export const ARGON2_PARAMS = { m: 19_456, t: 2, p: 1 } as const;
@@ -25,10 +24,8 @@ let argon2Available: boolean | null = null;
 
 function runArgon2(secret: Uint8Array, salt: Uint8Array, m: number, t: number, p: number): Promise<Uint8Array> {
   return new Promise((resolve, reject) => {
-    argon2(
-      'argon2id',
-      { message: secret, nonce: salt, parallelism: p, tagLength: KEY_BYTES, memory: m, passes: t },
-      (err, result) => (err ? reject(err) : resolve(new Uint8Array(result))),
+    argon2('argon2id', { message: secret, nonce: salt, parallelism: p, tagLength: KEY_BYTES, memory: m, passes: t }, (err, result) =>
+      err ? reject(err) : resolve(new Uint8Array(result)),
     );
   });
 }

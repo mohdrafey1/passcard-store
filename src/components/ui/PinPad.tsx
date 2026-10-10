@@ -95,9 +95,7 @@ export function PinPad({ length, onComplete, title, subtitle, error, onBiometric
             key={i}
             style={[
               styles.dot,
-              i < pin.length
-                ? { backgroundColor: c.brass, borderColor: c.brass }
-                : { borderColor: error ? c.danger : c.dotEmpty },
+              i < pin.length ? { backgroundColor: c.brass, borderColor: c.brass } : { borderColor: error ? c.danger : c.dotEmpty },
             ]}
           />
         ))}

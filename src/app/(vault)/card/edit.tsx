@@ -178,8 +178,20 @@ export default function CardEditScreen() {
             </View>
           </View>
 
-          <Field label="Nickname" value={form.cardNickname} onChangeText={(t) => set('cardNickname', t)} placeholder="HDFC Regalia" autoFocus={!existing} />
-          <Field label="Name on card" value={form.cardHolderName} onChangeText={(t) => set('cardHolderName', t)} autoCapitalize="characters" placeholder="Optional" />
+          <Field
+            label="Nickname"
+            value={form.cardNickname}
+            onChangeText={(t) => set('cardNickname', t)}
+            placeholder="HDFC Regalia"
+            autoFocus={!existing}
+          />
+          <Field
+            label="Name on card"
+            value={form.cardHolderName}
+            onChangeText={(t) => set('cardHolderName', t)}
+            autoCapitalize="characters"
+            placeholder="Optional"
+          />
           <Field
             label="Card number"
             value={formatCardNumber(form.cardNumber)}
@@ -190,7 +202,10 @@ export default function CardEditScreen() {
             error={errors.cardNumber}
             hint={
               form.cardNumber
-                ? [numberCheck.network.id === 'unknown' ? null : numberCheck.network.name, numberCheck.complete && !numberCheck.luhn ? 'fails the card check' : null]
+                ? [
+                    numberCheck.network.id === 'unknown' ? null : numberCheck.network.name,
+                    numberCheck.complete && !numberCheck.luhn ? 'fails the card check' : null,
+                  ]
                     .filter(Boolean)
                     .join(' · ') || null
                 : null
@@ -223,7 +238,13 @@ export default function CardEditScreen() {
               />
             </View>
           </View>
-          <Field label="Notes" value={form.notes} onChangeText={(t) => set('notes', t)} multiline placeholder="Statement date, bank helpline…" />
+          <Field
+            label="Notes"
+            value={form.notes}
+            onChangeText={(t) => set('notes', t)}
+            multiline
+            placeholder="Statement date, bank helpline…"
+          />
         </ScrollView>
       </KeyboardAvoidingView>
     </>

@@ -17,7 +17,17 @@ interface IconButtonProps {
 }
 
 /** 48dp touch target around a 22dp icon. */
-export function IconButton({ icon, label, onPress, tone = 'ink', size = 22, filled, disabled, style, accessibilityState }: IconButtonProps) {
+export function IconButton({
+  icon,
+  label,
+  onPress,
+  tone = 'ink',
+  size = 22,
+  filled,
+  disabled,
+  style,
+  accessibilityState,
+}: IconButtonProps) {
   const c = useTheme();
   const color = { ink: c.ink, ink2: c.ink2, brass: c.brassText, danger: c.danger, onBrass: c.onBrass }[tone];
   return (

@@ -43,7 +43,11 @@ export default function CardsScreen() {
         </View>
 
         {!front ? (
-          <EmptyState icon="credit-card" title="No cards yet" body="Keep card numbers, expiry dates and CVVs encrypted here, ready to copy at checkout.">
+          <EmptyState
+            icon="credit-card"
+            title="No cards yet"
+            body="Keep card numbers, expiry dates and CVVs encrypted here, ready to copy at checkout."
+          >
             <Button label="Add a card" icon="plus" onPress={() => router.push('/card/edit')} />
           </EmptyState>
         ) : (
@@ -81,7 +85,13 @@ export default function CardsScreen() {
             </View>
 
             <View style={styles.quick}>
-              <Button style={styles.quickButton} variant="secondary" label="Number" icon="copy" onPress={() => copy(front.cardNumber, 'Card number', { kind: 'card', id: front.id })} />
+              <Button
+                style={styles.quickButton}
+                variant="secondary"
+                label="Number"
+                icon="copy"
+                onPress={() => copy(front.cardNumber, 'Card number', { kind: 'card', id: front.id })}
+              />
               <Button
                 style={styles.quickButton}
                 variant="secondary"
@@ -89,7 +99,13 @@ export default function CardsScreen() {
                 icon="copy"
                 onPress={() => copy(formatExpiry(front.expiryMonth, front.expiryYear), 'Expiry', { kind: 'card', id: front.id })}
               />
-              <Button style={styles.quickButton} variant="secondary" label="CVV" icon="copy" onPress={() => copy(front.cvv, 'CVV', { kind: 'card', id: front.id })} />
+              <Button
+                style={styles.quickButton}
+                variant="secondary"
+                label="CVV"
+                icon="copy"
+                onPress={() => copy(front.cvv, 'CVV', { kind: 'card', id: front.id })}
+              />
             </View>
             <AppText variant="caption" tone="muted" align="center">
               {behind.length ? 'Tap a card to bring it forward. ' : ''}Tap the front card for details.
@@ -129,5 +145,15 @@ const styles = StyleSheet.create({
   titleRow: { flexDirection: 'row', alignItems: 'center', minHeight: 48 },
   quick: { flexDirection: 'row', gap: space.sm },
   quickButton: { flex: 1, paddingHorizontal: space.sm },
-  fab: { position: 'absolute', right: space.xl, bottom: space.xl, width: 58, height: 58, borderRadius: 18, alignItems: 'center', justifyContent: 'center', elevation: 4 },
+  fab: {
+    position: 'absolute',
+    right: space.xl,
+    bottom: space.xl,
+    width: 58,
+    height: 58,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 4,
+  },
 });

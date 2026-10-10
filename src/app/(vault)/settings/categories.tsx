@@ -22,8 +22,7 @@ export default function CategoriesScreen() {
   const [renaming, setRenaming] = useState<{ from: string; to: string } | null>(null);
 
   const countOf = (cat: string) => passwords.filter((p) => p.category === cat).length;
-  const exists = (name: string, except?: string) =>
-    categories.some((cat) => cat.toLowerCase() === name.toLowerCase() && cat !== except);
+  const exists = (name: string, except?: string) => categories.some((cat) => cat.toLowerCase() === name.toLowerCase() && cat !== except);
 
   const add = async () => {
     const name = newName.trim();
@@ -50,7 +49,10 @@ export default function CategoriesScreen() {
     if (!to || to === renaming.from) return setRenaming(null);
     if (exists(to, renaming.from)) return Alert.alert('Already exists', `There's already a category called “${to}”.`);
     await moveLogins(renaming.from, to);
-    await update('categories', categories.map((cat) => (cat === renaming.from ? to : cat)));
+    await update(
+      'categories',
+      categories.map((cat) => (cat === renaming.from ? to : cat)),
+    );
     setRenaming(null);
   };
 

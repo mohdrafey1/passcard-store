@@ -81,7 +81,12 @@ export default function LoginDetailScreen() {
               {entry.title}
             </AppText>
             {url ? (
-              <Pressable onPress={() => Linking.openURL(url)} accessibilityRole="link" accessibilityHint="Opens in your browser" style={styles.link}>
+              <Pressable
+                onPress={() => Linking.openURL(url)}
+                accessibilityRole="link"
+                accessibilityHint="Opens in your browser"
+                style={styles.link}
+              >
                 <AppText variant="label" tone="brass" numberOfLines={1} style={{ flexShrink: 1 }}>
                   {entry.website}
                 </AppText>
@@ -117,7 +122,11 @@ export default function LoginDetailScreen() {
             </DetailRow>
           ) : null}
           <View style={{ paddingBottom: space.md }}>
-            <DetailRow label="Password" value={revealed ? entry.password : '•'.repeat(Math.min(18, Math.max(8, entry.password.length)))} mono>
+            <DetailRow
+              label="Password"
+              value={revealed ? entry.password : '•'.repeat(Math.min(18, Math.max(8, entry.password.length)))}
+              mono
+            >
               <IconButton
                 icon={revealed ? 'eye-off' : 'eye'}
                 tone="ink2"
@@ -130,7 +139,10 @@ export default function LoginDetailScreen() {
               <StrengthMeter
                 score={strength.score}
                 label={strength.label}
-                detail={[counted(entry.password.length, 'character'), entry.passwordChangedAt ? `changed ${relativeAge(entry.passwordChangedAt)}` : null]
+                detail={[
+                  counted(entry.password.length, 'character'),
+                  entry.passwordChangedAt ? `changed ${relativeAge(entry.passwordChangedAt)}` : null,
+                ]
                   .filter(Boolean)
                   .join(' · ')}
               />
@@ -174,16 +186,25 @@ export default function LoginDetailScreen() {
         onClose={() => setMoreOpen(false)}
         title={entry.title}
         options={[
-          { label: 'Share without password', detail: 'Name, site and username only', icon: 'share-2', onPress: () => void sharePassword(entry) },
+          {
+            label: 'Share without password',
+            detail: 'Name, site and username only',
+            icon: 'share-2',
+            onPress: () => void sharePassword(entry),
+          },
           {
             label: 'Share with password',
             detail: 'Sends the password in plain text',
             icon: 'alert-triangle',
             onPress: () =>
-              Alert.alert('Share the password?', 'It leaves the vault as plain text. Only send it to someone you trust, over an app you trust.', [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Share', style: 'destructive', onPress: () => void sharePassword(entry, true) },
-              ]),
+              Alert.alert(
+                'Share the password?',
+                'It leaves the vault as plain text. Only send it to someone you trust, over an app you trust.',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Share', style: 'destructive', onPress: () => void sharePassword(entry, true) },
+                ],
+              ),
           },
           {
             label: 'Duplicate',

@@ -17,16 +17,7 @@ export interface AppSettings {
   categories: string[];
 }
 
-export const DEFAULT_CATEGORIES = [
-  'Personal',
-  'Work',
-  'Banking',
-  'Shopping',
-  'Social',
-  'Entertainment',
-  'Education',
-  'Other',
-];
+export const DEFAULT_CATEGORIES = ['Personal', 'Work', 'Banking', 'Shopping', 'Social', 'Entertainment', 'Education', 'Other'];
 
 export const DEFAULT_SETTINGS: AppSettings = {
   autoLockDuration: 0,

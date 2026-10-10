@@ -36,7 +36,12 @@ export default function ExportScreen() {
         title="CSV files are not encrypted"
         body="Anyone who opens the file can read every password and card number. To move to a new phone, use an encrypted backup instead."
       />
-      <Button label="Make an encrypted backup instead" variant="secondary" icon="archive" onPress={() => router.replace('/settings/backup')} />
+      <Button
+        label="Make an encrypted backup instead"
+        variant="secondary"
+        icon="archive"
+        onPress={() => router.replace('/settings/backup')}
+      />
       <AppText variant="body" tone="ink2">
         Use CSV to move to another password manager. Delete the file as soon as you&apos;ve imported it.
       </AppText>
@@ -54,7 +59,11 @@ export default function ExportScreen() {
           onPress={() => (cards.length ? setPending('cards') : Alert.alert('Nothing to export', 'There are no cards yet.'))}
         />
       </Group>
-      {busy ? <AppText variant="caption" tone="muted">Preparing the file…</AppText> : null}
+      {busy ? (
+        <AppText variant="caption" tone="muted">
+          Preparing the file…
+        </AppText>
+      ) : null}
       <ReauthModal
         visible={pending !== null}
         reason="export unencrypted"
