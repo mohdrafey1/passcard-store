@@ -1,242 +1,170 @@
-> 🎉 **Passcard Store is now Open Source!**
-> > This project is licensed under the [MIT License](./LICENSE) and is open for contributions from the community. Feel free to fork, star, and submit pull requests!
+> 🎉 **Passcard Store is open source!**
+> Licensed under the [MIT License](./LICENSE). Fork it, star it, and pull requests are welcome.
 
- # 🔐 Passcard Store
+# 🔐 Passcard Store
 
-A production-grade, fully offline secure vault for passwords and cards — built with Expo SDK 56, React Native, and TypeScript.
+A fully offline vault for passwords and cards on Android, built with Expo SDK 56, React Native and TypeScript.
 
-**All data stays on your device. No cloud. No accounts. No tracking.**
+**Everything stays on your phone. No cloud, no account, no tracking.**
 
 ---
 
 ## ✨ Features
 
 ### 🛡️ Security
-- **Master PIN** — 4 or 6 digit PIN with PBKDF2 hashing (10,000 iterations)
-- **PIN-Wrapped Data Key** — The AES data key is encrypted with a key derived from your PIN and only held in memory while unlocked, so the database can't be decrypted without the PIN
-- **AES-256-CBC Encryption** — Every sensitive record encrypted at rest with a per-record random IV
-- **CSPRNG Password Generator** — Generated passwords use the device's cryptographically secure RNG (never `Math.random()`)
-- **Biometric Unlock** — Fingerprint / Face authentication (on by default; falls back to PIN)
-- **Screenshot & Recents Protection** — Android `FLAG_SECURE` blocks screenshots/screen recording and hides vault contents in the app switcher
-- **Lockout Protection** — 5 failed attempts → 60 second lockout, **persisted across app restarts** and applied to biometric failures too
-- **Auto-Lock** — Configurable lock on app background (immediate / 30s / 1m / 5m / 15m)
-- **Clipboard Auto-Clear** — Automatically clears copied data after 15s / 30s / 60s
-- **Encrypted Backups** — backup files use AES-256 with a **per-backup random salt** and 210k PBKDF2 iterations (saved as `.txt` so any file manager can select them for restore; the contents are fully encrypted)
-- **Re-authentication** — Deleting all data and creating a backup require re-entering your PIN
-- **Secure metadata note** — Search index columns (titles, websites, emails, cardholder names, last 4 digits) are stored unencrypted for fast search; everything sensitive (passwords, full card numbers, CVVs) is always encrypted
 
-### 🔑 Password Management
-- Create, edit, duplicate, and delete password entries
-- Category organization (Social, Banking, Work, Personal, Shopping, etc.)
-- Category filter pills for quick browsing
-- Password strength indicator (Weak → Strong)
-- Random password generator with configurable options
-- Copy username / email / password with one tap
-- Share via native share sheet
+- **PIN or passphrase.** Choose a 6-digit PIN (recommended), a 4-digit PIN or a passphrase of 10+ characters. Obvious PINs such as `123456` or `111111` are rejected.
+- **Argon2id key slot.** A random 256-bit data key encrypts the vault. That key is wrapped with a key derived from your PIN or passphrase using Argon2id (19 MiB, 2 passes; PBKDF2-SHA256 with 600,000 iterations as a fallback). The PIN itself is never stored, not even as a hash.
+- **AES-256-GCM records.** Every entry is sealed as one encrypted document, bound to its table and ID so rows can't be swapped. Only the ID and timestamps are stored unencrypted, and search runs in memory on decrypted data.
+- **Fingerprint unlock.** Uses a copy of the data key kept in Android Keystore storage that only opens after a strong biometric check. Enrolling a new fingerprint invalidates it, and the app asks for your PIN before offering fingerprint again.
+- **Escalating lockout.** After every 5 wrong attempts the lockout grows (1 min, 5 min, 15 min, 1 h) and survives app restarts. Optionally, the vault is erased after 10 wrong tries in a row.
+- **Sensitive clipboard.** Copied secrets are flagged so Android 13+ hides them in the clipboard preview, and the clipboard is cleared after 15 s to 2 min, but only if it still holds what we copied.
+- **Screen protection.** `FLAG_SECURE` blocks screenshots and hides the vault in the recent apps screen. Auto-lock options range from immediately to 15 minutes.
+- **No Android backup.** `allowBackup` is off, so the vault isn't copied into cloud device backups.
 
-### 💳 Card Management
-- Store credit/debit card details securely
-- Visual credit card widgets with gradient styling
-- Masked card numbers (`•••• •••• •••• 1234`)
-- Tap to reveal sensitive card details
-- Copy card number / CVV / expiry
+### 🔑 Logins
 
-### 📊 Dashboard
-- Total passwords and cards count
-- Recently added items feed
-- Global search across all entries
-- Quick action grid (Add Password, Add Card, Import, Export)
+- Add, edit, duplicate, favourite and delete logins, with unsaved-changes protection
+- Categories you can add, rename and remove
+- Strength meter powered by zxcvbn, plus a "password age" hint
+- Generator for random passwords, EFF word passphrases and PINs, using the system CSPRNG
+- Swipe a row to copy the password or favourite it
+- **Recently deleted:** deleted items stay for 30 days with one-tap undo
 
-### 📦 Import / Export / Backup
-- **CSV Import** — Import passwords or cards from CSV files with duplicate detection
-- **CSV Export** — Export all data as CSV via native share sheet
-- **Encrypted Backup** — Create AES-256 encrypted backup files (PIN-required)
-- **Restore** — Restore from encrypted backup with PIN verification
+### 💳 Cards
 
-### ⚙️ Settings
-- Change PIN
-- Toggle biometric unlock
-- Auto-lock duration picker
-- Clipboard clear duration picker
-- Delete all data (with confirmation)
+- Wallet-style card faces with network detection (Visa, Mastercard, Amex, RuPay, Discover and more)
+- Luhn and expiry checks while you type, and an "expires soon" badge
+- Card number and CVV stay hidden until you reveal them, and hide again after 20 seconds
+
+### 📦 Backup, import and export
+
+- **Encrypted backups (`.pcbackup`).** Protected by a backup password you set once (12+ characters), separate from your PIN. Save straight to a folder or share the file. Restore can merge with or replace the current vault, including during first-time setup.
+- **Import** from Google Password Manager, Firefox, Bitwarden, 1Password, LastPass, KeePassXC, KeePass, Dashlane, generic CSV and older Passcard exports. Duplicates are skipped.
+- **CSV export** of logins or cards, with spreadsheet formula injection neutralised.
+- Optional backup reminders.
+
+### 🎨 Design
+
+- "Midnight Brass" dark theme and a light "Paper" theme, or follow the system
+- Manrope and JetBrains Mono fonts, colour pairs checked against WCAG contrast
+- Screen reader labels and actions throughout
 
 ---
 
-## 🏗️ Tech Stack
+## 🏗️ Tech stack
 
-| Layer | Technology |
-|-------|-----------|
-| Framework | Expo SDK 56 + React Native 0.85 |
-| Language | TypeScript (strict) |
-| Navigation | Expo Router (file-based) |
-| State | Zustand |
-| Database | expo-sqlite (WAL mode) |
-| Encryption | crypto-js (AES-256-CBC) |
-| Hashing | crypto-js (PBKDF2) + expo-crypto (random bytes) |
-| Key Storage | expo-secure-store |
-| Biometrics | expo-local-authentication |
-| CSV | papaparse |
-| File I/O | expo-file-system (SDK 56 File API) |
-| Sharing | expo-sharing |
-| Clipboard | expo-clipboard |
-| Haptics | expo-haptics |
-| Styling | StyleSheet.create() (pure CSS) |
-| Platform | Android only |
+| Layer          | Technology                                                           |
+| -------------- | -------------------------------------------------------------------- |
+| Framework      | Expo SDK 56, React Native 0.85, React 19 (React Compiler)            |
+| Language       | TypeScript (strict)                                                  |
+| Navigation     | Expo Router with `Stack.Protected` guards                            |
+| State          | Zustand                                                              |
+| Database       | expo-sqlite (WAL)                                                    |
+| Encryption     | expo-crypto (AES-256-GCM)                                            |
+| Key derivation | react-native-quick-crypto (Argon2id, PBKDF2)                         |
+| Key storage    | expo-secure-store (Android Keystore)                                 |
+| Biometrics     | expo-secure-store `requireAuthentication`, expo-local-authentication |
+| Strength       | zxcvbn-ts                                                            |
+| CSV            | papaparse                                                            |
+| Clipboard      | Local Expo module (`modules/sensitive-clipboard`)                    |
+| Tests          | Jest (jest-expo)                                                     |
+| Platform       | Android                                                              |
 
 ---
 
-## 📁 Project Structure
+## 📁 Project structure
 
 ```
+modules/
+└── sensitive-clipboard/        # Local Expo module: copy with EXTRA_IS_SENSITIVE
 src/
-├── app/                          # Expo Router screens
-│   ├── _layout.tsx               # Root layout (init + auth gate)
-│   ├── index.tsx                 # Redirect based on auth state
-│   ├── (auth)/                   # Auth flow
-│   │   ├── create-pin.tsx        # First-time PIN setup
-│   │   └── unlock.tsx            # PIN unlock + biometrics
-│   └── (tabs)/                   # Main app
-│       ├── _layout.tsx           # Bottom tab navigator
-│       ├── index.tsx             # Dashboard
-│       ├── passwords/            # Password CRUD screens
-│       ├── cards/                # Card CRUD screens
-│       └── settings/             # Settings, import, export, backup
-├── components/                   # Reusable UI components
-│   ├── PinPad.tsx                # Numeric keypad with haptics
-│   ├── PasswordStrengthIndicator.tsx
-│   ├── SecureField.tsx           # Masked input with eye toggle
-│   ├── SearchBar.tsx
-│   ├── VaultCard.tsx
-│   └── EmptyState.tsx
-├── constants/
-│   ├── theme.ts                  # Design system (colors, spacing, shadows)
-│   └── categories.ts            # Password categories + icons
-├── features/
-│   ├── passwords/store.ts       # Zustand password store
-│   ├── cards/store.ts           # Zustand card store
-│   ├── settings/store.ts        # Zustand settings + auth store
-│   └── import-export/
-│       ├── csv-handler.ts       # CSV import/export
-│       └── backup-handler.ts    # Encrypted .vaultx backup/restore
-├── hooks/
-│   ├── useAutoLock.ts           # Background auto-lock
-│   └── useDebounce.ts           # Search debounce
-├── security/
-│   ├── encryption.ts            # AES-256-CBC encrypt/decrypt
-│   ├── pin.ts                   # PBKDF2 PIN hashing
-│   ├── biometrics.ts            # Biometric auth wrapper
-│   └── lockout.ts               # Failed attempt tracking
-├── storage/
-│   ├── database.ts              # SQLite init + schema
-│   ├── encrypted-repository.ts  # Generic encrypted CRUD
-│   ├── password-repository.ts   # Password collection
-│   ├── card-repository.ts       # Card collection
-│   └── settings-storage.ts     # Settings in SecureStore
+├── app/                        # Expo Router screens
+│   ├── _layout.tsx             # Boot, theme, protected route groups
+│   ├── unlock.tsx              # PIN / passphrase / fingerprint unlock, lockout
+│   ├── (onboarding)/           # Welcome, unlock method, create secret, restore
+│   └── (vault)/
+│       ├── (tabs)/             # Vault, Cards, Settings
+│       ├── login/              # Login detail and editor
+│       ├── card/               # Card detail and editor
+│       ├── generator.tsx       # Password generator sheet
+│       └── settings/           # Unlock method, backup, import, export, deleted, categories
+├── components/
+│   ├── ui/                     # Design system: text, buttons, fields, sheets, pin pad, toast
+│   ├── VaultRow.tsx            # Swipeable list row
+│   └── ReauthModal.tsx         # Re-enter PIN before sensitive actions
+├── features/                   # Zustand stores and app logic
+│   ├── session/                # Unlock, lock, erase, lockout checks
+│   ├── import-export/          # Backups, importers, CSV
+│   └── vault/                  # List filtering, sorting, shared actions
+├── security/                   # aead, kdf, key-manager, lockout, pin rules, legacy migration
+├── storage/                    # SQLite schema and encrypted repositories
+├── theme/                      # Palettes, typography, spacing
 ├── types/
-│   ├── password.ts
-│   ├── card.ts
-│   └── settings.ts
-└── utils/
-    ├── clipboard.ts             # Copy with auto-clear
-    ├── share.ts                 # Native share sheet
-    └── password-generator.ts    # Random password + strength
+└── utils/                      # Generator, cards, clipboard, strength, sharing
 ```
 
 ---
 
-## 🔒 Security Architecture
+## 🔒 Security architecture
 
 ```
-┌─────────────────────────────────────────┐
-│               App Layer                  │
-│  Screens → Zustand Stores → Repository  │
-└────────────────┬────────────────────────┘
-                 │
-┌────────────────▼────────────────────────┐
-│        Encrypted Repository              │
-│  encrypt(JSON) → SQLite encrypted_data   │
-│  Search index columns (plaintext)        │
-└────────────────┬────────────────────────┘
-                 │
-┌────────────────▼──────────┐  ┌──────────────────────┐
-│      expo-sqlite          │  │   expo-secure-store   │
-│  • encrypted_data (AES)   │  │  • Encryption Key     │
-│  • search indexes         │  │  • PIN Hash (PBKDF2)  │
-│  • timestamps             │  │  • PIN Salt           │
-└───────────────────────────┘  │  • App Settings       │
-                               └──────────────────────┘
+ PIN / passphrase ──Argon2id──▶ key-encryption key ──unwraps──▶ data key (memory only)
+                                                                    │
+ Fingerprint ──Keystore biometric check──▶ copy of data key ────────┤
+                                                                    ▼
+                                    SQLite: id, timestamps, AES-256-GCM(entry JSON)
 ```
 
-- **Sensitive fields** (passwords, card numbers, CVVs) are always AES-256-CBC encrypted in `encrypted_data`
-- **Search index columns** (title, website, email, nickname) are stored as plaintext for SQL query performance
-- **Encryption key** is a 256-bit random key stored in device Keystore via `expo-secure-store`
-- **PIN hash** uses PBKDF2 with random salt — raw PIN is never stored
+- The wrapped data key, KDF parameters and salt live in a single SecureStore entry.
+- The data key only exists in memory while the vault is unlocked, and is dropped on lock.
+- Vaults from v1.0–v1.2 (crypto-js AES-CBC, PBKDF2 PIN hash) are migrated on the first unlock after updating: the key is rewrapped, every row is re-encrypted with AES-GCM and the old plaintext search columns are cleared.
+- Backups use their own Argon2id-derived key, so sharing a backup never exposes your PIN.
 
 ---
 
-## 🚀 Getting Started
+## 🚀 Getting started
 
 ### Prerequisites
 
-- Node.js 20+ (recommended: 22.x)
-- Android Studio with emulator or physical Android device
-- Expo CLI
+- Node.js 20+ (22.x recommended)
+- Android Studio with an emulator, or an Android phone with USB debugging
 
-### Installation
+### Install and run
 
 ```bash
-# Clone the repository
 git clone https://github.com/mohdrafey1/passcard-store.git
 cd passcard-store
-
-# Install dependencies
 npm install
-```
 
-### Development
-
-```bash
-# Start Expo development server
-npx expo start
-
-# Run on Android emulator
-npx expo start --android
-
-# Create a development build (required for native modules)
+# Build and install a development build (needs native modules, so Expo Go won't work)
 npx expo run:android
 ```
 
-> **Note:** This app uses native modules (`expo-sqlite`, `expo-secure-store`, `expo-local-authentication`) that require a **development build**. Expo Go may have limited functionality.
-
-### Type Checking
+### Checks
 
 ```bash
-npx tsc --noEmit
+npm run typecheck   # tsc --noEmit
+npm test            # Jest unit tests
+npm run lint        # ESLint (eslint-config-expo)
 ```
 
----
-
-## 📱 App Flow
-
-1. **First Launch** → Create 4 or 6 digit PIN
-2. **Subsequent Opens** → Unlock with PIN or biometrics
-3. **Dashboard** → View stats, search, quick actions
-4. **Manage** → Add/edit/delete passwords and cards
-5. **Protect** → Data auto-encrypted, clipboard auto-cleared
-6. **Backup** → Export CSV or create encrypted `.vaultx` backup
+In development builds `FLAG_SECURE` is off so you can take screenshots. Release builds always have it on.
 
 ---
 
-## 📄 CSV Format
+## 📄 CSV formats
 
-### Passwords CSV
+Imports detect the source automatically from the header row. Passcard's own export looks like this:
+
+**Logins**
 
 ```csv
 title,website,username,email,password,notes,category
 Gmail,gmail.com,johndoe,john@gmail.com,MyP@ss123,Primary email,Personal
 ```
 
-### Cards CSV
+**Cards**
 
 ```csv
 cardNickname,cardHolderName,cardNumber,expiryMonth,expiryYear,cvv,notes
@@ -245,18 +173,6 @@ My Visa,John Doe,4111111111111111,12,25,123,Primary card
 
 ---
 
-## 🛠️ Built With
-
-- [Expo](https://expo.dev) — React Native framework
-- [Expo Router](https://docs.expo.dev/router/introduction/) — File-based routing
-- [Zustand](https://github.com/pmndrs/zustand) — State management
-- [crypto-js](https://github.com/brix/crypto-js) — AES-256 encryption & PBKDF2
-- [papaparse](https://www.papaparse.com/) — CSV parsing
-- [expo-sqlite](https://docs.expo.dev/versions/v56.0.0/sdk/sqlite/) — Local database
-- [expo-secure-store](https://docs.expo.dev/versions/v56.0.0/sdk/securestore/) — Secure key storage
-
----
-
 ## 📜 License
 
-This project is private and not licensed for redistribution.
+[MIT](./LICENSE)

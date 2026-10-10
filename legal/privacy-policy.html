@@ -32,7 +32,7 @@
     <div class="page-head">
       <div class="container">
         <h1>Privacy Policy</h1>
-        <p class="updated">Last updated: 3 August 2026</p>
+        <p class="updated">Last updated: 10 October 2026</p>
       </div>
     </div>
 
@@ -79,7 +79,7 @@
         <ul>
           <li>Password entries (titles, websites, usernames, emails, passwords, notes, categories)</li>
           <li>Card entries (cardholder name, card number, expiry, CVV, nickname, notes)</li>
-          <li>App settings (PIN length, biometric preference, auto-lock and clipboard timers)</li>
+          <li>App settings (unlock method, fingerprint preference, auto-lock and clipboard timers, theme, categories, backup reminder)</li>
         </ul>
         <p>
           All of this is stored <strong>locally on your device only</strong>. It is never
@@ -89,28 +89,39 @@
         <h2 id="storage">3. How your data is stored and secured</h2>
         <ul>
           <li>
-            Sensitive data (passwords, full card numbers, CVVs) is encrypted with
-            <strong>AES-256</strong> and stored in a local database on your device.
+            Every entry (titles, websites, usernames, passwords, notes, card numbers, CVVs and
+            everything else you type) is encrypted with <strong>AES-256-GCM</strong> and stored
+            in a local database on your device. Only an internal ID and timestamps are stored
+            unencrypted.
           </li>
           <li>
-            The encryption key is protected by a key derived from your PIN and is only held in
-            memory while the app is unlocked.
+            The encryption key is itself encrypted with a key derived from your PIN or
+            passphrase using <strong>Argon2id</strong>. Your PIN or passphrase is never stored,
+            not even as a hash. The unlocked key is only held in memory while the app is open
+            and unlocked.
           </li>
           <li>
-            Your PIN is never stored in plain text — only a salted PBKDF2 hash is kept, in the
-            device's secure storage (Android Keystore).
+            If you turn on fingerprint unlock, a copy of the key is kept in Android Keystore
+            protected storage that only releases it after your phone confirms your fingerprint.
+            Adding a new fingerprint in your phone's settings invalidates that copy, and you'll
+            need your PIN or passphrase again.
           </li>
           <li>
-            Backups you create are encrypted with AES-256 using
-            your PIN. CSV exports are <strong>not</strong> encrypted — you control where those
-            files go.
+            Backups are encrypted with AES-256-GCM using a <strong>backup password</strong> you
+            choose, separate from your PIN. CSV exports are <strong>not</strong> encrypted —
+            you control where those files go.
+          </li>
+          <li>
+            Passwords and card numbers you copy are marked as sensitive, so Android 13 and later
+            hide them in the clipboard preview, and the app clears the clipboard after the time
+            you set.
           </li>
         </ul>
         <div class="callout">
           <p>
             Because everything is stored only on your device with no cloud copy, we cannot
-            recover your data or PIN if you lose your device or forget your PIN. Please keep a
-            backup.
+            recover your data, PIN or passphrase if you lose your device or forget them. Please
+            keep a backup and remember your backup password.
           </p>
         </div>
 
@@ -120,8 +131,8 @@
             <tr><th>Permission</th><th>Why it is used</th></tr>
           </thead>
           <tbody>
-            <tr><td>Biometric / Fingerprint</td><td>To let you unlock the vault with your fingerprint or face, if you enable it. Biometric data is handled entirely by your device's operating system and is never accessed by the app.</td></tr>
-            <tr><td>Files (document picker)</td><td>Only when you choose to import a CSV or restore a backup file that you select.</td></tr>
+            <tr><td>Biometric / Fingerprint</td><td>To let you unlock the vault with your fingerprint (or another strong biometric your phone supports), if you turn it on. Biometric data is handled entirely by your device's operating system and is never accessed by the app.</td></tr>
+            <tr><td>Files (system file picker)</td><td>Only when you choose to import a CSV, restore a backup file you select, or save a backup to a folder you pick. The app can't see any other files.</td></tr>
             <tr><td>Sharing</td><td>Only when you tap "share" or "export" to send a file through your device's share sheet.</td></tr>
           </tbody>
         </table>
@@ -137,6 +148,11 @@
             Expo's update service (EAS Update) so you receive improvements and fixes. This
             checks for a new app version only; it does not transmit any of your personal or
             vault data.
+          </li>
+          <li>
+            <strong>Links you open.</strong> Tapping the privacy policy, terms or source code
+            links in the app opens those web pages in a browser tab. Nothing from your vault is
+            sent.
           </li>
           <li>
             <strong>Distribution.</strong> The app is distributed through the Google Play
@@ -166,7 +182,7 @@
           at any time inside the app. To remove everything:
         </p>
         <ul>
-          <li>Open <strong>Settings → Delete All Data</strong> to permanently erase the vault, or</li>
+          <li>Open <strong>Settings → Erase vault</strong> to permanently erase the vault, or</li>
           <li>Uninstall the app, which removes all locally stored data.</li>
         </ul>
         <p>See the <a href="contact.html">Contact &amp; Data Deletion</a> page for full details.</p>

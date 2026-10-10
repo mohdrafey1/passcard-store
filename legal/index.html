@@ -67,7 +67,7 @@
           <h1>Your passwords &amp; cards,<br />locked to your device.</h1>
           <p class="lead">
             Passcard Store is a secure, fully offline vault. Everything is encrypted with
-            AES-256 and stays on your phone — no cloud, no sign-up, no data collection.
+            AES-256-GCM and stays on your phone — no cloud, no sign-up, no data collection.
           </p>
           <div class="cta-row">
             <a
@@ -110,8 +110,8 @@
               <div class="emoji">🛡️</div>
               <h3>Encrypted at rest</h3>
               <p>
-                Every password, card number and CVV is encrypted with AES-256. The data key
-                is protected by your PIN and never stored in the clear.
+                Every entry is encrypted with AES-256-GCM. The data key is locked with your
+                PIN or passphrase through Argon2id and never stored in the clear.
               </p>
             </div>
             <div class="card">
@@ -124,9 +124,9 @@
             </div>
             <div class="card">
               <div class="emoji">🔑</div>
-              <h3>PIN &amp; biometrics</h3>
+              <h3>PIN, passphrase &amp; fingerprint</h3>
               <p>
-                Unlock with a 4 or 6-digit PIN or your fingerprint/face. Auto-lock and
+                Unlock with a 6-digit PIN, a passphrase or your fingerprint. Auto-lock and
                 clipboard auto-clear keep things private.
               </p>
             </div>
@@ -144,7 +144,7 @@
             </div>
             <div class="feature">
               <span class="emoji">📦</span>
-              <div><h4>Encrypted backups</h4><p>Create AES-256 encrypted backups, or export/import via CSV — you decide where they go.</p></div>
+              <div><h4>Encrypted backups</h4><p>Create encrypted backups with their own password, or import from Google, Bitwarden, 1Password and more — you decide where they go.</p></div>
             </div>
             <div class="feature">
               <span class="emoji">⏱️</span>
