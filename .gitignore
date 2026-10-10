@@ -42,6 +42,6 @@ example
 /ios
 /android
 
-# Native projects are generated (CNG); never commit them
-/android
-/ios
+# Local Expo module build output
+modules/*/android/build
+modules/*/android/.gradle

@@ -158,6 +158,14 @@ export class EncryptedRepository<T extends BaseEntity> {
     }
   }
 
+  async countDeleted(): Promise<number> {
+    const db = await getDatabase();
+    const result = await db.getFirstAsync<{ count: number }>(
+      `SELECT COUNT(*) as count FROM ${this.table} WHERE deleted_at IS NOT NULL`,
+    );
+    return result?.count ?? 0;
+  }
+
   async count(): Promise<number> {
     const db = await getDatabase();
     const result = await db.getFirstAsync<{ count: number }>(

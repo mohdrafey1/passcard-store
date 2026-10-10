@@ -1,31 +1,19 @@
-import Papa from 'papaparse';
-import { Paths, File } from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
-import type { PasswordEntry } from '@/types/password';
-import type { CardEntry } from '@/types/card';
-import { passwordRepository } from '@/storage/password-repository';
-import { cardRepository } from '@/storage/card-repository';
-import { cleanupTempFile } from '@/utils/cache';
-import { runWithoutAutoLock } from '@/utils/auto-lock-guard';
-import { DEFAULT_CATEGORIES } from '@/constants/categories';
 import * as ExpoCrypto from 'expo-crypto';
+import { File, Paths } from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import Papa from 'papaparse';
+import { cardRepository } from '@/storage/card-repository';
+import { passwordRepository } from '@/storage/password-repository';
+import type { CardEntry } from '@/types/card';
+import type { PasswordEntry } from '@/types/password';
+import { runWithoutAutoLock } from '@/utils/auto-lock-guard';
+import { cleanupTempFile } from '@/utils/cache';
+import { loginKey, type ImportProblem, type ParsedImport } from './import-formats';
 
-const VALID_CATEGORIES = new Set<string>(DEFAULT_CATEGORIES);
+// ---- Export (plain CSV; the UI warns that it isn't encrypted) ----
 
-export interface ImportResult {
-  imported: number;
-  skipped: number;
-  failed: number;
-  errors: string[];
-}
-
-// ---- EXPORT ----
-
-/**
- * Export passwords to CSV string
- */
 export function exportPasswordsToCSV(passwords: PasswordEntry[]): string {
-  const data = passwords.map((p) => ({
+  const rows = passwords.map((p) => ({
     title: p.title,
     website: p.website,
     username: p.username,
@@ -35,14 +23,11 @@ export function exportPasswordsToCSV(passwords: PasswordEntry[]): string {
     category: p.category,
   }));
   // escapeFormulae: a value like =HYPERLINK(...) must stay text in a spreadsheet.
-  return Papa.unparse(data, { escapeFormulae: true });
+  return Papa.unparse(rows, { escapeFormulae: true });
 }
 
-/**
- * Export cards to CSV string
- */
 export function exportCardsToCSV(cards: CardEntry[]): string {
-  const data = cards.map((c) => ({
+  const rows = cards.map((c) => ({
     cardNickname: c.cardNickname,
     cardHolderName: c.cardHolderName,
     cardNumber: c.cardNumber,
@@ -51,205 +36,62 @@ export function exportCardsToCSV(cards: CardEntry[]): string {
     cvv: c.cvv,
     notes: c.notes,
   }));
-  return Papa.unparse(data, { escapeFormulae: true });
+  return Papa.unparse(rows, { escapeFormulae: true });
 }
 
-/**
- * Save CSV to file and share
- */
+/** Write to cache, hand to the share sheet, then delete the plaintext file. */
 export async function exportAndShareCSV(csvContent: string, filename: string): Promise<void> {
   const file = new File(Paths.cache, filename);
   file.write(csvContent);
-
-  const isAvailable = await Sharing.isAvailableAsync();
-  if (isAvailable) {
-    try {
-      await runWithoutAutoLock(() =>
-        Sharing.shareAsync(file.uri, {
-          mimeType: 'text/csv',
-          dialogTitle: `Export ${filename}`,
-        }),
-      );
-    } finally {
-      // Exported CSV is unencrypted plaintext — remove it from cache once shared.
-      cleanupTempFile(file.uri);
-    }
-  } else {
+  try {
+    if (!(await Sharing.isAvailableAsync())) throw new Error('Sharing is not available on this device.');
+    await runWithoutAutoLock(() => Sharing.shareAsync(file.uri, { mimeType: 'text/csv', dialogTitle: `Export ${filename}` }));
+  } finally {
     cleanupTempFile(file.uri);
   }
 }
 
-// ---- IMPORT ----
+// ---- Save a parsed import ----
 
-const REQUIRED_PASSWORD_FIELDS = ['title', 'email', 'password'];
-const REQUIRED_CARD_FIELDS = ['cardHolderName', 'cardNumber', 'expiryMonth', 'expiryYear', 'cvv'];
-
-/**
- * Import passwords from CSV string
- */
-export async function importPasswordsFromCSV(csvContent: string): Promise<ImportResult> {
-  const result: ImportResult = { imported: 0, skipped: 0, failed: 0, errors: [] };
-
-  const parsed = Papa.parse(csvContent, {
-    header: true,
-    skipEmptyLines: true,
-    transformHeader: (h: string) => h.trim(),
-  });
-
-  if (parsed.errors.length > 0) {
-    result.errors.push(...parsed.errors.map((e) => `Row ${e.row}: ${e.message}`));
-  }
-
-  // Validate required columns exist
-  const headers = parsed.meta.fields || [];
-  const missingFields = REQUIRED_PASSWORD_FIELDS.filter((f) => !headers.includes(f));
-  if (missingFields.length > 0) {
-    result.errors.push(`Missing required columns: ${missingFields.join(', ')}`);
-    result.failed = parsed.data.length;
-    return result;
-  }
-
-  // Get existing passwords for duplicate detection
-  const existing = await passwordRepository.findAll();
-  const existingKeys = new Set(
-    existing.map((p) => `${p.title.toLowerCase()}:${p.email.toLowerCase()}`),
-  );
-
-  const toImport: PasswordEntry[] = [];
-
-  for (let i = 0; i < parsed.data.length; i++) {
-    const row = parsed.data[i] as Record<string, string>;
-    try {
-      const title = (row.title || '').trim();
-      const email = (row.email || '').trim();
-      const password = (row.password || '').trim();
-
-      if (!title || !password) {
-        result.failed++;
-        result.errors.push(`Row ${i + 1}: Missing title or password`);
-        continue;
-      }
-
-      // Check for duplicates
-      const key = `${title.toLowerCase()}:${email.toLowerCase()}`;
-      if (existingKeys.has(key)) {
-        result.skipped++;
-        continue;
-      }
-
-      const rawCategory = (row.category || 'Other').trim();
-      // Guard against arbitrary category strings that would break the filter
-      // pills and category icons.
-      const category = (VALID_CATEGORIES.has(rawCategory)
-        ? rawCategory
-        : 'Other') as PasswordEntry['category'];
-
-      const now = new Date().toISOString();
-      toImport.push({
-        id: ExpoCrypto.randomUUID(),
-        title,
-        website: (row.website || '').trim(),
-        username: (row.username || '').trim(),
-        email,
-        password,
-        notes: (row.notes || '').trim(),
-        category,
-        favorite: false,
-        lastUsedAt: null,
-        passwordChangedAt: now,
-        createdAt: now,
-        updatedAt: now,
-      });
-
-      existingKeys.add(key);
-    } catch {
-      result.failed++;
-      result.errors.push(`Row ${i + 1}: Parse error`);
-    }
-  }
-
-  if (toImport.length > 0) {
-    await passwordRepository.upsertMany(toImport);
-    result.imported = toImport.length;
-  }
-
-  return result;
+export interface ImportOutcome {
+  logins: number;
+  cards: number;
+  /** Already in the vault (same name, user and password / same card number). */
+  duplicates: number;
+  /** Notes, identities and other non-login rows that were left out. */
+  skipped: number;
+  problems: ImportProblem[];
 }
 
-/**
- * Import cards from CSV string
- */
-export async function importCardsFromCSV(csvContent: string): Promise<ImportResult> {
-  const result: ImportResult = { imported: 0, skipped: 0, failed: 0, errors: [] };
+export async function saveImport(parsed: ParsedImport): Promise<ImportOutcome> {
+  const [existingLogins, existingCards] = await Promise.all([passwordRepository.findAll(), cardRepository.findAll()]);
+  const seenLogins = new Set(existingLogins.map(loginKey));
+  const seenCards = new Set(existingCards.map((c) => c.cardNumber));
+  const now = new Date().toISOString();
+  let duplicates = 0;
 
-  const parsed = Papa.parse(csvContent, {
-    header: true,
-    skipEmptyLines: true,
-    transformHeader: (h: string) => h.trim(),
-  });
-
-  if (parsed.errors.length > 0) {
-    result.errors.push(...parsed.errors.map((e) => `Row ${e.row}: ${e.message}`));
-  }
-
-  const headers = parsed.meta.fields || [];
-  const missingFields = REQUIRED_CARD_FIELDS.filter((f) => !headers.includes(f));
-  if (missingFields.length > 0) {
-    result.errors.push(`Missing required columns: ${missingFields.join(', ')}`);
-    result.failed = parsed.data.length;
-    return result;
-  }
-
-  const existing = await cardRepository.findAll();
-  const existingCards = new Set(existing.map((c) => c.cardNumber));
-
-  const toImport: CardEntry[] = [];
-
-  for (let i = 0; i < parsed.data.length; i++) {
-    const row = parsed.data[i] as Record<string, string>;
-    try {
-      const cardNumber = (row.cardNumber || '').trim().replace(/\s/g, '');
-      const cardHolderName = (row.cardHolderName || '').trim();
-
-      if (!cardNumber || !cardHolderName) {
-        result.failed++;
-        result.errors.push(`Row ${i + 1}: Missing card number or holder name`);
-        continue;
-      }
-
-      if (existingCards.has(cardNumber)) {
-        result.skipped++;
-        continue;
-      }
-
-      const now = new Date().toISOString();
-      toImport.push({
-        id: ExpoCrypto.randomUUID(),
-        cardHolderName,
-        cardNumber,
-        expiryMonth: (row.expiryMonth || '').trim(),
-        expiryYear: (row.expiryYear || '').trim(),
-        cvv: (row.cvv || '').trim(),
-        cardNickname: (row.cardNickname || '').trim(),
-        notes: (row.notes || '').trim(),
-        color: 'navy',
-        favorite: false,
-        lastUsedAt: null,
-        createdAt: now,
-        updatedAt: now,
-      });
-
-      existingCards.add(cardNumber);
-    } catch {
-      result.failed++;
-      result.errors.push(`Row ${i + 1}: Parse error`);
+  const logins: PasswordEntry[] = [];
+  for (const d of parsed.logins) {
+    const key = loginKey(d);
+    if (seenLogins.has(key)) {
+      duplicates++;
+      continue;
     }
+    seenLogins.add(key);
+    logins.push({ ...d, id: ExpoCrypto.randomUUID(), lastUsedAt: null, passwordChangedAt: null, createdAt: now, updatedAt: now });
   }
 
-  if (toImport.length > 0) {
-    await cardRepository.upsertMany(toImport);
-    result.imported = toImport.length;
+  const cards: CardEntry[] = [];
+  for (const d of parsed.cards) {
+    if (seenCards.has(d.cardNumber)) {
+      duplicates++;
+      continue;
+    }
+    seenCards.add(d.cardNumber);
+    cards.push({ ...d, id: ExpoCrypto.randomUUID(), color: 'navy', favorite: false, lastUsedAt: null, createdAt: now, updatedAt: now });
   }
 
-  return result;
+  if (logins.length) await passwordRepository.upsertMany(logins);
+  if (cards.length) await cardRepository.upsertMany(cards);
+  return { logins: logins.length, cards: cards.length, duplicates, skipped: parsed.skipped, problems: parsed.problems };
 }

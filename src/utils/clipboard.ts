@@ -1,4 +1,5 @@
 import * as Clipboard from 'expo-clipboard';
+import { clearClipboardAsync, setSensitiveStringAsync } from '@/modules/sensitive-clipboard';
 
 let clearTimer: ReturnType<typeof setTimeout> | null = null;
 let pendingValue: string | null = null;
@@ -19,7 +20,7 @@ async function clearIfStillOurs(): Promise<void> {
   } catch {
     // fall through to clearing
   }
-  await Clipboard.setStringAsync('').catch(() => {});
+  await clearClipboardAsync().catch(() => {});
 }
 
 /**
@@ -27,7 +28,7 @@ async function clearIfStillOurs(): Promise<void> {
  * has been copied since.
  */
 export async function copyToClipboard(text: string, clearAfterSeconds?: number): Promise<void> {
-  await Clipboard.setStringAsync(text);
+  await setSensitiveStringAsync(text);
   if (clearTimer) clearTimeout(clearTimer);
   clearTimer = null;
   pendingValue = null;

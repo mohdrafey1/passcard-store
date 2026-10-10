@@ -181,7 +181,7 @@ export function Banner({
   );
   if (!onPress) return <View accessible accessibilityRole="text">{inner}</View>;
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={[title, body, action].filter(Boolean).join('. ')}>
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={[title, body, action].filter(Boolean).map((part) => String(part).replace(/[.\s]+$/, '')).join('. ')}>
       {inner}
     </Pressable>
   );

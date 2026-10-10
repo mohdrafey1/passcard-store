@@ -11,6 +11,8 @@ import {
 } from '../password-generator';
 
 jest.mock('expo-crypto', () => ({
+  // Mock factories can't reference imports, so pull in Node's crypto here.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   getRandomBytes: (n: number) => new Uint8Array(require('crypto').randomBytes(n)),
 }));
 

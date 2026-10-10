@@ -250,11 +250,10 @@ export async function applyBackup(payload: BackupPayload, mode: 'replace' | 'mer
       const byId = new Map(local.map((x) => [x.id, x]));
       return incoming.filter((item) => {
         const mine = byId.get(item.id);
-        if (mine && mine.updatedAt >= item.updatedAt) {
-          keptNewer++;
-          return false;
-        }
-        return true;
+        if (!mine || mine.updatedAt < item.updatedAt) return true;
+        // Same timestamp means the same version: nothing to do, nothing to report.
+        if (mine.updatedAt > item.updatedAt) keptNewer++;
+        return false;
       });
     };
     passwords = newer(passwords, localPasswords);

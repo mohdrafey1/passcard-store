@@ -2,7 +2,7 @@
   "expo": {
     "name": "Passcard Store",
     "slug": "passcard-store",
-    "version": "1.1.2",
+    "version": "1.3.0",
     "orientation": "portrait",
     "icon": "./assets/logo.png",
     "scheme": "passcardstore",
@@ -12,7 +12,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#F6F2EB",
+        "backgroundColor": "#0B1120",
         "foregroundImage": "./assets/logo.png",
         "backgroundImage": "./assets/logo.png",
         "monochromeImage": "./assets/logo.png"
@@ -37,12 +37,73 @@
     "plugins": [
       "expo-router",
       [
+        "expo-font",
+        {
+          "android": {
+            "fonts": [
+              {
+                "fontFamily": "Manrope",
+                "fontDefinitions": [
+                  {
+                    "path": "./assets/fonts/Manrope_400Regular.ttf",
+                    "weight": 400
+                  },
+                  {
+                    "path": "./assets/fonts/Manrope_500Medium.ttf",
+                    "weight": 500
+                  },
+                  {
+                    "path": "./assets/fonts/Manrope_600SemiBold.ttf",
+                    "weight": 600
+                  },
+                  {
+                    "path": "./assets/fonts/Manrope_700Bold.ttf",
+                    "weight": 700
+                  },
+                  {
+                    "path": "./assets/fonts/Manrope_800ExtraBold.ttf",
+                    "weight": 800
+                  }
+                ]
+              },
+              {
+                "fontFamily": "JetBrains Mono",
+                "fontDefinitions": [
+                  {
+                    "path": "./assets/fonts/JetBrainsMono_500Medium.ttf",
+                    "weight": 500
+                  },
+                  {
+                    "path": "./assets/fonts/JetBrainsMono_600SemiBold.ttf",
+                    "weight": 600
+                  }
+                ]
+              }
+            ]
+          },
+          "ios": {
+            "fonts": [
+              "./assets/fonts/Manrope_400Regular.ttf",
+              "./assets/fonts/Manrope_500Medium.ttf",
+              "./assets/fonts/Manrope_600SemiBold.ttf",
+              "./assets/fonts/Manrope_700Bold.ttf",
+              "./assets/fonts/Manrope_800ExtraBold.ttf",
+              "./assets/fonts/JetBrainsMono_500Medium.ttf",
+              "./assets/fonts/JetBrainsMono_600SemiBold.ttf"
+            ]
+          }
+        }
+      ],
+      [
         "expo-splash-screen",
         {
-          "backgroundColor": "#F6F2EB",
+          "backgroundColor": "#0B1120",
+          "image": "./assets/logo.png",
+          "imageWidth": 120,
           "android": {
             "image": "./assets/logo.png",
-            "imageWidth": 76
+            "imageWidth": 120,
+            "backgroundColor": "#0B1120"
           }
         }
       ],

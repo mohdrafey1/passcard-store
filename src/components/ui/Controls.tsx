@@ -42,18 +42,22 @@ export function ChipRow<T extends string>({
   value,
   onChange,
   label,
+  inset = 0,
 }: {
   options: ChipOption<T>[];
   value: T;
   onChange: (v: T) => void;
   label: string;
+  /** Let the row scroll to the screen edges past this much container padding. */
+  inset?: number;
 }) {
   const c = useTheme();
   return (
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.chipRow}
+      style={inset ? { marginHorizontal: -inset } : undefined}
+      contentContainerStyle={[styles.chipRow, inset ? { paddingHorizontal: inset } : null]}
       accessibilityLabel={label}
       keyboardShouldPersistTaps="handled"
     >

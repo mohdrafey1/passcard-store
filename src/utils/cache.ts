@@ -8,7 +8,7 @@ import { Paths, Directory, File } from 'expo-file-system';
  */
 
 const TEMP_PREFIXES = ['password-', 'card-', 'passcard-'];
-const TEMP_SUFFIXES = ['.csv', '.vaultx', '.txt'];
+const TEMP_SUFFIXES = ['.csv', '.vaultx', '.txt', '.pcbackup'];
 
 function isTempExportFile(name: string): boolean {
   return (

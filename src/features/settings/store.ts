@@ -92,5 +92,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     set({ biometricsEnabled: enabled });
   },
 
-  resetToDefaults: () => set({ ...DEFAULT_SETTINGS, ...INITIAL_SECURITY, isInitialized: true }),
+  // Whether the phone has a fingerprint is about the device, not the vault: keep it
+  // so onboarding can offer fingerprint unlock again right after an erase.
+  resetToDefaults: () =>
+    set({ ...DEFAULT_SETTINGS, ...INITIAL_SECURITY, isInitialized: true, biometricsAvailable: get().biometricsAvailable }),
 }));

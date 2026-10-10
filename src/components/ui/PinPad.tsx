@@ -24,13 +24,19 @@ const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'bio', '0', 'del'] as
 export function PinPad({ length, onComplete, title, subtitle, error, onBiometric, disabled, resetKey }: PinPadProps) {
   const c = useTheme();
   const [pin, setPin] = useState('');
+  const [lastResetKey, setLastResetKey] = useState(resetKey);
+  const [lastError, setLastError] = useState(error);
   const shake = useSharedValue(0);
 
-  useEffect(() => setPin(''), [resetKey]);
+  // Clear the entry when asked to, or when a new error comes in.
+  if (resetKey !== lastResetKey || error !== lastError) {
+    if (resetKey !== lastResetKey || error) setPin('');
+    setLastResetKey(resetKey);
+    setLastError(error);
+  }
 
   useEffect(() => {
     if (!error) return;
-    setPin('');
     shake.value = withSequence(
       withTiming(-10, { duration: 50 }),
       withTiming(10, { duration: 50 }),
