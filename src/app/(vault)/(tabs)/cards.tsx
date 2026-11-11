@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { AppText } from '@/components/ui/AppText';
@@ -7,30 +7,23 @@ import { CardFace } from '@/components/ui/CardFace';
 import { Icon } from '@/components/ui/Icon';
 import { Banner, EmptyState, Screen } from '@/components/ui/Layout';
 import { useCardStore } from '@/features/cards/store';
-import { useCopySecret } from '@/features/vault/actions';
 import { space, useTheme } from '@/theme';
 import { expiryState, formatExpiry } from '@/utils/cards';
-
-const STRIP = 72;
 
 export default function CardsScreen() {
   const c = useTheme();
   const cards = useCardStore((s) => s.cards);
-  const copy = useCopySecret();
   const ordered = useMemo(
     () => [...cards].sort((a, b) => Number(b.favorite) - Number(a.favorite) || b.updatedAt.localeCompare(a.updatedAt)),
     [cards],
   );
-  const [frontId, setFrontId] = useState<string | null>(null);
-  const front = ordered.find((cd) => cd.id === frontId) ?? ordered[0];
-  const behind = ordered.filter((cd) => cd.id !== front?.id);
   const attention = ordered
     .map((cd) => ({ card: cd, state: expiryState(cd.expiryMonth, cd.expiryYear) }))
     .filter((x) => x.state === 'expiring' || x.state === 'expired');
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.titleRow}>
           <AppText variant="display" accessibilityRole="header" style={{ flex: 1 }}>
             Cards
@@ -42,7 +35,7 @@ export default function CardsScreen() {
           ) : null}
         </View>
 
-        {!front ? (
+        {ordered.length === 0 ? (
           <EmptyState
             icon="credit-card"
             title="No cards yet"
@@ -52,68 +45,9 @@ export default function CardsScreen() {
           </EmptyState>
         ) : (
           <>
-            <View>
-              {behind.map((cd) => (
-                <Pressable
-                  key={cd.id}
-                  onPress={() => setFrontId(cd.id)}
-                  accessibilityRole="button"
-                  accessibilityHint="Brings this card to the front"
-                  style={{ height: STRIP - 12 }}
-                >
-                  <CardFace
-                    compact
-                    nickname={cd.cardNickname}
-                    holder={cd.cardHolderName}
-                    number={cd.cardNumber}
-                    expiryMonth={cd.expiryMonth}
-                    expiryYear={cd.expiryYear}
-                    color={cd.color}
-                  />
-                </Pressable>
-              ))}
-              <Pressable onPress={() => router.push(`/card/${front.id}`)} accessibilityRole="button" accessibilityHint="Opens card details">
-                <CardFace
-                  nickname={front.cardNickname}
-                  holder={front.cardHolderName}
-                  number={front.cardNumber}
-                  expiryMonth={front.expiryMonth}
-                  expiryYear={front.expiryYear}
-                  color={front.color}
-                />
-              </Pressable>
-            </View>
-
-            <View style={styles.quick}>
-              <Button
-                style={styles.quickButton}
-                variant="secondary"
-                label="Number"
-                icon="copy"
-                onPress={() => copy(front.cardNumber, 'Card number', { kind: 'card', id: front.id })}
-              />
-              <Button
-                style={styles.quickButton}
-                variant="secondary"
-                label="Expiry"
-                icon="copy"
-                onPress={() => copy(formatExpiry(front.expiryMonth, front.expiryYear), 'Expiry', { kind: 'card', id: front.id })}
-              />
-              <Button
-                style={styles.quickButton}
-                variant="secondary"
-                label="CVV"
-                icon="copy"
-                onPress={() => copy(front.cvv, 'CVV', { kind: 'card', id: front.id })}
-              />
-            </View>
-            <AppText variant="caption" tone="muted" align="center">
-              {behind.length ? 'Tap a card to bring it forward. ' : ''}Tap the front card for details.
-            </AppText>
-
             {attention.map(({ card, state }) => (
               <Banner
-                key={card.id}
+                key={`attn-${card.id}`}
                 tone={state === 'expired' ? 'danger' : 'warn'}
                 icon="clock"
                 title={`${card.cardNickname || 'A card'} ${state === 'expired' ? 'has expired' : 'expires soon'}`}
@@ -122,11 +56,34 @@ export default function CardsScreen() {
                 onPress={() => router.push(`/card/edit?id=${card.id}`)}
               />
             ))}
+
+            {ordered.map((cd) => (
+              <Pressable
+                key={cd.id}
+                onPress={() => router.push(`/card/${cd.id}`)}
+                accessibilityRole="button"
+                accessibilityHint="Opens card details"
+                style={({ pressed }) => [pressed && { opacity: 0.85 }]}
+              >
+                <CardFace
+                  nickname={cd.cardNickname}
+                  holder={cd.cardHolderName}
+                  number={cd.cardNumber}
+                  expiryMonth={cd.expiryMonth}
+                  expiryYear={cd.expiryYear}
+                  color={cd.color}
+                />
+              </Pressable>
+            ))}
+
+            <AppText variant="caption" tone="muted" align="center">
+              Tap a card for details and to copy its number, expiry or CVV.
+            </AppText>
           </>
         )}
       </ScrollView>
 
-      {front ? (
+      {ordered.length > 0 ? (
         <Pressable
           onPress={() => router.push('/card/edit')}
           accessibilityRole="button"
@@ -143,8 +100,6 @@ export default function CardsScreen() {
 const styles = StyleSheet.create({
   content: { padding: space.xl, paddingTop: space.lg, gap: space.lg, paddingBottom: 120 },
   titleRow: { flexDirection: 'row', alignItems: 'center', minHeight: 48 },
-  quick: { flexDirection: 'row', gap: space.sm },
-  quickButton: { flex: 1, paddingHorizontal: space.sm },
   fab: {
     position: 'absolute',
     right: space.xl,
