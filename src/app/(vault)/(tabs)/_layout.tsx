@@ -9,7 +9,7 @@ import { space, useTheme } from '@/theme';
 type TabBarProps = Parameters<NonNullable<React.ComponentProps<typeof Tabs>['tabBar']>>[0];
 
 const TABS: Record<string, { label: string; icon: IconName }> = {
-  index: { label: 'Vault', icon: 'key' },
+  index: { label: 'Passwords', icon: 'key' },
   cards: { label: 'Cards', icon: 'credit-card' },
   settings: { label: 'Settings', icon: 'sliders' },
 };
@@ -55,7 +55,7 @@ function TabBar({ state, navigation }: TabBarProps) {
 export default function TabsLayout() {
   return (
     <Tabs screenOptions={{ headerShown: false }} tabBar={(props) => <TabBar {...props} />}>
-      <Tabs.Screen name="index" options={{ title: 'Vault' }} />
+      <Tabs.Screen name="index" options={{ title: 'Passwords' }} />
       <Tabs.Screen name="cards" options={{ title: 'Cards' }} />
       <Tabs.Screen name="settings" options={{ title: 'Settings' }} />
     </Tabs>

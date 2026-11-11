@@ -9,7 +9,6 @@ import { IconButton } from '@/components/ui/IconButton';
 import { Banner, EmptyState, Screen } from '@/components/ui/Layout';
 import { Sheet, type SheetOption } from '@/components/ui/Sheet';
 import { VaultRow } from '@/components/VaultRow';
-import { useCardStore } from '@/features/cards/store';
 import { usePasswordStore } from '@/features/passwords/store';
 import { lockVault } from '@/features/session/session';
 import { useSettingsStore } from '@/features/settings/store';
@@ -28,30 +27,26 @@ import { passwordRepository } from '@/storage/password-repository';
 import { cardRepository } from '@/storage/card-repository';
 import { FONT, radius, space, useTheme } from '@/theme';
 import { BACKUP_REMINDER_OPTIONS } from '@/types/settings';
-import { formatExpiry } from '@/utils/cards';
 
-export default function VaultScreen() {
+export default function PasswordsScreen() {
   const c = useTheme();
   const passwords = usePasswordStore((s) => s.passwords);
-  const cards = useCardStore((s) => s.cards);
   const { categories, lastBackupAt, backupReminder } = useSettingsStore();
   const copy = useCopySecret();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<VaultFilter>('all');
   const [sort, setSort] = useState<SortMode>('name');
   const [sortOpen, setSortOpen] = useState(false);
-  const [addOpen, setAddOpen] = useState(false);
   const [menuItem, setMenuItem] = useState<VaultItem | null>(null);
 
-  const all = useMemo(() => toItems(passwords, cards), [passwords, cards]);
+  // Logins only — cards live on the Cards tab.
+  const all = useMemo(() => toItems(passwords, []), [passwords]);
   const items = useMemo(() => sortItems(filterItems(all, query, filter), sort), [all, query, filter, sort]);
 
   const usedCategories = useMemo(() => categories.filter((cat) => passwords.some((p) => p.category === cat)), [categories, passwords]);
   const chips = [
     { value: 'all' as VaultFilter, label: 'All' },
     { value: 'favorites' as VaultFilter, label: 'Favourites' },
-    { value: 'logins' as VaultFilter, label: 'Logins' },
-    { value: 'cards' as VaultFilter, label: 'Cards' },
     ...usedCategories.map((cat) => ({ value: `category:${cat}` as VaultFilter, label: cat })),
   ];
   const filterLabel = chips.find((ch) => ch.value === filter)?.label ?? 'All';
@@ -60,39 +55,23 @@ export default function VaultScreen() {
   const nudge = backupNudge(lastBackupAt, reminderDays, all.length);
   const unreadable = passwordRepository.unreadable + cardRepository.unreadable;
 
-  const open = (item: VaultItem) => router.push(item.kind === 'login' ? `/login/${item.id}` : `/card/${item.id}`);
-  const copyMain = (item: VaultItem) =>
-    item.kind === 'login' ? copy(item.entry.password, 'Password', item) : copy(item.entry.cardNumber, 'Card number', item);
+  const open = (item: VaultItem) => router.push(`/login/${item.id}`);
+  const copyMain = (item: VaultItem) => item.kind === 'login' && copy(item.entry.password, 'Password', item);
 
   const menuOptions = (item: VaultItem): SheetOption[] => {
-    const common: SheetOption[] = [
+    if (item.kind !== 'login') return [];
+    const p = item.entry;
+    return [
+      { label: 'Copy password', icon: 'copy', onPress: () => void copy(p.password, 'Password', item) },
+      ...(p.username ? [{ label: 'Copy username', icon: 'user' as const, onPress: () => void copy(p.username, 'Username', item) }] : []),
+      ...(p.email ? [{ label: 'Copy email', icon: 'mail' as const, onPress: () => void copy(p.email, 'Email', item) }] : []),
       {
-        label: item.entry.favorite ? 'Remove from favourites' : 'Add to favourites',
+        label: p.favorite ? 'Remove from favourites' : 'Add to favourites',
         icon: 'star',
         onPress: () => void toggleFavorite(item),
       },
-      {
-        label: 'Edit',
-        icon: 'edit-2',
-        onPress: () => router.push(item.kind === 'login' ? `/login/edit?id=${item.id}` : `/card/edit?id=${item.id}`),
-      },
+      { label: 'Edit', icon: 'edit-2', onPress: () => router.push(`/login/edit?id=${item.id}`) },
       { label: 'Delete', icon: 'trash-2', destructive: true, onPress: () => void deleteWithUndo(item, item.title) },
-    ];
-    if (item.kind === 'login') {
-      const p = item.entry;
-      return [
-        { label: 'Copy password', icon: 'copy', onPress: () => void copy(p.password, 'Password', item) },
-        ...(p.username ? [{ label: 'Copy username', icon: 'user' as const, onPress: () => void copy(p.username, 'Username', item) }] : []),
-        ...(p.email ? [{ label: 'Copy email', icon: 'mail' as const, onPress: () => void copy(p.email, 'Email', item) }] : []),
-        ...common,
-      ];
-    }
-    const cd = item.entry;
-    return [
-      { label: 'Copy card number', icon: 'copy', onPress: () => void copy(cd.cardNumber, 'Card number', item) },
-      { label: 'Copy expiry', icon: 'calendar', onPress: () => void copy(formatExpiry(cd.expiryMonth, cd.expiryYear), 'Expiry', item) },
-      { label: 'Copy CVV', icon: 'hash', onPress: () => void copy(cd.cvv, 'CVV', item) },
-      ...common,
     ];
   };
 
@@ -100,7 +79,7 @@ export default function VaultScreen() {
     <View style={styles.header}>
       <View style={styles.titleRow}>
         <AppText variant="display" accessibilityRole="header" style={{ flex: 1 }}>
-          Vault
+          Passwords
         </AppText>
         <IconButton icon="sparkle" label="Password generator" onPress={() => router.push('/generator')} />
         <IconButton icon="lock" label="Lock now" onPress={lockVault} style={{ marginRight: -space.sm }} />
@@ -111,9 +90,9 @@ export default function VaultScreen() {
         <TextInput
           value={query}
           onChangeText={setQuery}
-          placeholder="Search logins and cards"
+          placeholder="Search passwords"
           placeholderTextColor={c.muted}
-          accessibilityLabel="Search logins and cards"
+          accessibilityLabel="Search passwords"
           autoCorrect={false}
           autoCapitalize="none"
           importantForAutofill="no"
@@ -188,14 +167,14 @@ export default function VaultScreen() {
           all.length === 0 ? (
             <EmptyState
               icon="key"
-              title="Your vault is empty"
-              body="Add a login or card, or bring everything over from another password manager."
+              title="No passwords yet"
+              body="Add a login, or bring everything over from another password manager."
             >
               <Button label="Add a login" icon="plus" onPress={() => router.push('/login/edit')} />
               <Button label="Import from another app" variant="secondary" onPress={() => router.push('/settings/import')} />
             </EmptyState>
           ) : (
-            <EmptyState icon="search" title="Nothing matches" body={query ? `No results for “${query}”.` : `No items in ${filterLabel}.`}>
+            <EmptyState icon="search" title="Nothing matches" body={query ? `No results for “${query}”.` : `No passwords in ${filterLabel}.`}>
               <Button
                 label="Show everything"
                 variant="secondary"
@@ -211,9 +190,9 @@ export default function VaultScreen() {
 
       {all.length > 0 ? (
         <Pressable
-          onPress={() => setAddOpen(true)}
+          onPress={() => router.push('/login/edit')}
           accessibilityRole="button"
-          accessibilityLabel="Add item"
+          accessibilityLabel="Add a login"
           style={({ pressed }) => [styles.fab, { backgroundColor: c.brass, opacity: pressed ? 0.85 : 1 }]}
         >
           <Icon name="plus" size={26} color={c.onBrass} />
@@ -230,15 +209,6 @@ export default function VaultScreen() {
           selected: m === sort,
           onPress: () => setSort(m),
         }))}
-      />
-      <Sheet
-        visible={addOpen}
-        onClose={() => setAddOpen(false)}
-        title="Add to vault"
-        options={[
-          { label: 'Login', detail: 'A website or app account', icon: 'key', onPress: () => router.push('/login/edit') },
-          { label: 'Card', detail: 'A credit or debit card', icon: 'credit-card', onPress: () => router.push('/card/edit') },
-        ]}
       />
       <Sheet
         visible={menuItem !== null}
