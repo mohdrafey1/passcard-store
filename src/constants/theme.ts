@@ -45,9 +45,9 @@ export const Colors = {
   categoryOther: '#A0927F',
 };
 
-// Credit-card widget gradient (dark → darker) kept here so every card renders
-// from the same source of truth.
-export const CardGradient: [string, string, string] = ['#3D2E22', '#1F1712', '#130E0A'];
+// Credit-card widget gradient (warm espresso → near-black) kept here so every
+// card renders from the same source of truth.
+export const CardGradient: [string, string, string] = ['#4B3927', '#271C13', '#130C07'];
 
 export const Spacing = {
   xs: 4,

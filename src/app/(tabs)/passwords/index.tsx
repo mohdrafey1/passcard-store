@@ -3,19 +3,54 @@ import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, ActivityIndi
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, FontSize, Spacing, BorderRadius } from '@/constants/theme';
+import { Colors, FontSize, Spacing, BorderRadius, Shadow } from '@/constants/theme';
 import SearchBar from '@/components/SearchBar';
-import VaultCard from '@/components/VaultCard';
 import EmptyState from '@/components/EmptyState';
 import ActionSheet, { type SheetAction } from '@/components/ActionSheet';
 import { usePasswordStore } from '@/features/passwords/store';
 import { copyToClipboard } from '@/utils/clipboard';
 import { showToast } from '@/utils/toast';
 import { sharePassword } from '@/utils/share';
-import { CATEGORY_ICONS, DEFAULT_CATEGORIES } from '@/constants/categories';
+import { CATEGORY_ICONS, CATEGORY_COLORS, DEFAULT_CATEGORIES } from '@/constants/categories';
 import { useSettingsStore } from '@/features/settings/store';
 import type { PasswordEntry, PasswordCategory } from '@/types/password';
 import { useDebounce } from '@/hooks/useDebounce';
+
+function PasswordRow({ item, onPress, onLongPress }: {
+  item: PasswordEntry; onPress: () => void; onLongPress: () => void;
+}) {
+  const accent = CATEGORY_COLORS[item.category] || Colors.primary;
+  const icon = CATEGORY_ICONS[item.category] || '🔒';
+  const subtitle = item.website || item.email || item.username || 'No login details';
+  const initial = (item.title || '?').trim().charAt(0).toUpperCase();
+
+  return (
+    <TouchableOpacity
+      style={styles.row}
+      onPress={onPress}
+      onLongPress={onLongPress}
+      activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityLabel={`${item.title}, ${item.category}`}
+    >
+      <View style={[styles.rowAccent, { backgroundColor: accent }]} />
+      <View style={[styles.avatar, { backgroundColor: accent + '1A', borderColor: accent + '40' }]}>
+        <Text style={styles.avatarInitial}>{initial}</Text>
+        <Text style={styles.avatarBadge}>{icon}</Text>
+      </View>
+      <View style={styles.rowText}>
+        <Text style={styles.rowTitle} numberOfLines={1}>{item.title}</Text>
+        <Text style={styles.rowSub} numberOfLines={1}>{subtitle}</Text>
+      </View>
+      <View style={styles.rowRight}>
+        <View style={[styles.badge, { backgroundColor: accent + '18' }]}>
+          <Text style={[styles.badgeText, { color: accent }]} numberOfLines={1}>{item.category}</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
+      </View>
+    </TouchableOpacity>
+  );
+}
 
 export default function PasswordListScreen() {
   const params = useLocalSearchParams<{ search?: string }>();
@@ -81,11 +116,8 @@ export default function PasswordListScreen() {
     : [];
 
   const renderItem = ({ item }: { item: PasswordEntry }) => (
-    <VaultCard
-      title={item.title}
-      subtitle={item.website || item.email}
-      leftIcon={<Text style={{ fontSize: 18 }}>{CATEGORY_ICONS[item.category] || '🔒'}</Text>}
-      rightText={item.category}
+    <PasswordRow
+      item={item}
       onPress={() => router.push(`/(tabs)/passwords/${item.id}`)}
       onLongPress={() => setActionItem(item)}
     />
@@ -198,4 +230,58 @@ const styles = StyleSheet.create({
   list: { flex: 1 },
   listContent: { flexGrow: 1, paddingHorizontal: Spacing.base, paddingBottom: Spacing['3xl'] },
   loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: Spacing['4xl'] },
+
+  // Password row
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.lg,
+    paddingVertical: Spacing.md,
+    paddingRight: Spacing.md,
+    paddingLeft: Spacing.base,
+    marginBottom: Spacing.sm,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    overflow: 'hidden',
+    ...Shadow.sm,
+  },
+  rowAccent: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
+  },
+  avatar: {
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    marginRight: Spacing.md,
+  },
+  avatarInitial: {
+    fontSize: FontSize.md,
+    fontWeight: '800',
+    color: Colors.text,
+  },
+  avatarBadge: {
+    position: 'absolute',
+    bottom: -4,
+    right: -4,
+    fontSize: 13,
+  },
+  rowText: { flex: 1, marginRight: Spacing.sm },
+  rowTitle: { fontSize: FontSize.base, fontWeight: '700', color: Colors.text },
+  rowSub: { fontSize: FontSize.sm, color: Colors.textSecondary, marginTop: 2 },
+  rowRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  badge: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.full,
+    maxWidth: 110,
+  },
+  badgeText: { fontSize: FontSize.xs, fontWeight: '700' },
 });

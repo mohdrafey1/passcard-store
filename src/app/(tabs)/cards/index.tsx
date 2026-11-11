@@ -38,35 +38,52 @@ function CreditCardWidget({ card, onPress, onLongPress }: { card: CardEntry; onP
     : maskedNumber;
 
   return (
-    <TouchableOpacity onPress={onPress} onLongPress={onLongPress} activeOpacity={0.8}>
+    <TouchableOpacity onPress={onPress} onLongPress={onLongPress} activeOpacity={0.85}>
       <LinearGradient
         colors={CardGradient}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={[styles.creditCard, Shadow.md]}
       >
-        <View style={styles.cardHeader}>
-          <Text style={styles.cardNickname}>{card.cardNickname || 'Card'}</Text>
+        {/* soft highlight */}
+        <View style={styles.cardGlow} pointerEvents="none" />
+
+        <View style={styles.cardTop}>
+          <View>
+            <Text style={styles.cardBrand}>PASSCARD</Text>
+            <Text style={styles.cardNickname} numberOfLines={1}>{card.cardNickname || 'Card'}</Text>
+          </View>
           <TouchableOpacity
             onPress={() => setRevealed(!revealed)}
             accessibilityRole="button"
             accessibilityLabel={revealed ? 'Hide card details' : 'Reveal card details'}
-            hitSlop={8}
+            hitSlop={10}
+            style={styles.eyeButton}
           >
-            <Ionicons name={revealed ? 'eye-off' : 'eye'} size={20} color={Colors.primaryLight} />
+            <Ionicons name={revealed ? 'eye-off' : 'eye'} size={18} color={Colors.primaryLight} />
           </TouchableOpacity>
         </View>
-        <Text style={styles.cardNumber}>{displayNumber}</Text>
-        <View style={styles.cardFooter}>
-          <View>
-            <Text style={styles.cardLabel}>CARD HOLDER</Text>
-            <Text style={styles.cardValue}>{card.cardHolderName}</Text>
+
+        <View style={styles.chipRow}>
+          <View style={styles.chip}>
+            <View style={styles.chipLineH} />
+            <View style={styles.chipLineV} />
           </View>
-          <View>
-            <Text style={styles.cardLabel}>EXPIRY</Text>
+          <Ionicons name="wifi" size={22} color="#E8CE9A" style={styles.contactless} />
+        </View>
+
+        <Text style={styles.cardNumber}>{displayNumber}</Text>
+
+        <View style={styles.cardFooter}>
+          <View style={styles.footerBlock}>
+            <Text style={styles.cardLabel}>CARD HOLDER</Text>
+            <Text style={styles.cardValue} numberOfLines={1}>{card.cardHolderName || '—'}</Text>
+          </View>
+          <View style={styles.footerBlockSm}>
+            <Text style={styles.cardLabel}>EXPIRES</Text>
             <Text style={styles.cardValue}>{card.expiryMonth}/{card.expiryYear}</Text>
           </View>
-          <View>
+          <View style={styles.footerBlockSm}>
             <Text style={styles.cardLabel}>CVV</Text>
             <Text style={styles.cardValue}>{revealed ? card.cvv : '•••'}</Text>
           </View>
@@ -181,11 +198,39 @@ const styles = StyleSheet.create({
   list: { flex: 1 },
   listContent: { flexGrow: 1, paddingHorizontal: Spacing.base, paddingBottom: Spacing['3xl'] },
   loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: Spacing['4xl'] },
-  creditCard: { borderRadius: BorderRadius.xl, padding: Spacing.lg, marginBottom: Spacing.base, minHeight: 200, justifyContent: 'space-between' },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  cardNickname: { fontSize: FontSize.base, fontWeight: '600', color: Colors.primaryLight },
-  cardNumber: { fontSize: FontSize.lg, fontWeight: '700', color: '#FFFFFF', letterSpacing: 3, marginVertical: Spacing.lg, fontFamily: 'monospace' },
-  cardFooter: { flexDirection: 'row', justifyContent: 'space-between' },
-  cardLabel: { fontSize: 9, color: '#B0A090', letterSpacing: 1, marginBottom: 2 },
+  creditCard: { borderRadius: BorderRadius.xl, padding: Spacing.lg, marginBottom: Spacing.base, minHeight: 208, justifyContent: 'space-between', overflow: 'hidden' },
+  cardGlow: {
+    position: 'absolute',
+    top: -70,
+    right: -50,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: 'rgba(240, 193, 75, 0.14)',
+  },
+  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  cardBrand: { fontSize: 10, fontWeight: '800', letterSpacing: 2, color: 'rgba(240,193,75,0.75)' },
+  cardNickname: { fontSize: FontSize.md, fontWeight: '700', color: '#FFFFFF', marginTop: 3, maxWidth: 190 },
+  eyeButton: {
+    width: 34, height: 34, borderRadius: 17,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  chipRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, marginTop: Spacing.sm },
+  chip: {
+    width: 44, height: 34, borderRadius: 7,
+    backgroundColor: '#E7C25C',
+    borderWidth: 1, borderColor: 'rgba(0,0,0,0.15)',
+    alignItems: 'center', justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  chipLineH: { position: 'absolute', width: '100%', height: 1, backgroundColor: 'rgba(90,60,10,0.4)' },
+  chipLineV: { position: 'absolute', height: '100%', width: 1, backgroundColor: 'rgba(90,60,10,0.4)' },
+  contactless: { transform: [{ rotate: '90deg' }], opacity: 0.85 },
+  cardNumber: { fontSize: 19, fontWeight: '700', color: '#FFFFFF', letterSpacing: 2, marginVertical: Spacing.md, fontFamily: 'monospace' },
+  cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
+  footerBlock: { flex: 1, marginRight: Spacing.md },
+  footerBlockSm: { alignItems: 'flex-start', marginLeft: Spacing.lg },
+  cardLabel: { fontSize: 9, color: 'rgba(224,206,154,0.75)', letterSpacing: 1, marginBottom: 3 },
   cardValue: { fontSize: FontSize.sm, fontWeight: '600', color: '#FFFFFF' },
 });
